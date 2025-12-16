@@ -1,24 +1,26 @@
-import type React from "react"
-import { Sidebar } from "@/components/sidebar"
-import { Header } from "@/components/header"
-import { Footer } from "@/components/footer"
-import { AuthProvider } from "@/components/auth-provider"
+import type React from "react";
+import { Sidebar } from "@/components/sidebar";
+import { Header } from "@/components/header";
+import { Footer } from "@/components/footer";
+import { AuthProvider } from "@/components/auth-provider";
 
 export default function SystemInfoLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
   return (
     <AuthProvider>
-      <div className="flex h-screen">
+      <div className="flex h-dvh md:h-screen">
         <Sidebar />
-        <div className="flex flex-col flex-1 overflow-hidden">
+        <div className="flex flex-col flex-1 overflow-hidden min-h-0">
           <Header />
-          <main className="flex-1 overflow-y-auto p-6 bg-background">{children}</main>
-          <Footer />
+          <main className="flex-1 min-h-0 overflow-y-auto p-4 md:p-6 bg-background">
+            {children}
+          </main>
+          <Footer className="h-8 md:h-12 shrink-0" />
         </div>
       </div>
     </AuthProvider>
-  )
+  );
 }
