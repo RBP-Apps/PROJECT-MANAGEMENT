@@ -11,14 +11,14 @@ export default function DashboardLayout({
 }) {
   return (
     <AuthProvider>
-      <div className="flex min-h-dvh">
+      <div className="flex h-dvh md:h-screen">
         <Sidebar />
-        <div className="flex flex-col flex-1 overflow-hidden">
+        <div className="flex flex-col flex-1 overflow-hidden min-h-0">
           <Header />
-          <main className="flex-1 overflow-y-auto p-6 bg-background">
+          <main className="flex-1 min-h-0 overflow-y-auto p-4 md:p-6 bg-background">
             {children}
           </main>
-          <Footer />
+          <Footer className="h-8 md:h-12 shrink-0" />
         </div>
       </div>
     </AuthProvider>
