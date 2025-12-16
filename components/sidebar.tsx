@@ -16,9 +16,12 @@ import {
   Activity,
   CreditCard,
   LogOut,
+  Menu,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
+import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet"
+import { useState } from "react"
 
 const menuItems = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -34,7 +37,12 @@ const menuItems = [
   { name: "Payment", href: "/payment", icon: CreditCard },
 ]
 
-export function Sidebar() {
+interface SidebarContentProps {
+  className?: string
+  onLinkClick?: () => void
+}
+
+function SidebarContent({ className, onLinkClick }: SidebarContentProps) {
   const pathname = usePathname()
   const router = useRouter()
 
@@ -45,7 +53,7 @@ export function Sidebar() {
   }
 
   return (
-    <div className="flex h-screen w-64 flex-col bg-white shadow-lg border-r border-gray-100">
+    <div className={cn("flex h-full flex-col bg-white shadow-lg border-r border-gray-100", className)}>
       <div className="p-6 border-b border-gray-200">
         <h1 className="text-2xl font-bold text-gray-900">Admin Panel</h1>
       </div>
@@ -59,6 +67,7 @@ export function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={onLinkClick}
               className={cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
                 isActive
@@ -84,5 +93,32 @@ export function Sidebar() {
         </Button>
       </div>
     </div>
+  )
+}
+
+export function Sidebar() {
+  return (
+    <div className="hidden md:flex h-screen w-64 flex-col">
+      <SidebarContent />
+    </div>
+  )
+}
+
+export function MobileSidebar() {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
+        <Button variant="ghost" size="icon" className="md:hidden">
+          <Menu className="h-6 w-6" />
+          <span className="sr-only">Toggle sidebar</span>
+        </Button>
+      </SheetTrigger>
+      <SheetContent side="left" className="p-0 w-72">
+        <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
+        <SidebarContent onLinkClick={() => setOpen(false)} />
+      </SheetContent>
+    </Sheet>
   )
 }

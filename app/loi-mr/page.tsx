@@ -164,60 +164,119 @@ export default function LoiMrPage() {
                   No pending items. Add beneficiaries in the Portal first.
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader className="bg-gradient-to-r from-blue-50 to-cyan-50">
-                      <TableRow className="border-b border-blue-200">
-                        <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap w-32">Action</TableHead>
-                        <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Serial No</TableHead>
-                        <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Reg ID</TableHead>
-                        <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Beneficiary Name</TableHead>
-                        <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Father's Name</TableHead>
-                        <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Village</TableHead>
-                        <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Block</TableHead>
-                        <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">District</TableHead>
-                        <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Category</TableHead>
-                        <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Pump Source</TableHead>
-                        <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Pump Type</TableHead>
-                        <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Company</TableHead>
-                        <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {pendingItems.map((item) => (
-                        <TableRow key={item.serialNo}>
-                          <TableCell>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleActionClick(item)}
-                              className="flex items-center gap-1"
-                            >
-                              <Pencil className="h-4 w-4" />
-                              Process
-                            </Button>
-                          </TableCell>
-                          <TableCell className="font-medium">{item.serialNo}</TableCell>
-                          <TableCell>{item.regId}</TableCell>
-                          <TableCell>{item.beneficiaryName}</TableCell>
-                          <TableCell>{item.fatherName}</TableCell>
-                          <TableCell>{item.village}</TableCell>
-                          <TableCell>{item.block}</TableCell>
-                          <TableCell>{item.district}</TableCell>
-                          <TableCell>{item.category}</TableCell>
-                          <TableCell>{item.pumpSource}</TableCell>
-                          <TableCell>{item.pumpType}</TableCell>
-                          <TableCell>{item.company}</TableCell>
-                          <TableCell>
-                            <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
+                <>
+                  <div className="hidden md:block overflow-x-auto">
+                    <Table>
+                      <TableHeader className="bg-gradient-to-r from-blue-50 to-cyan-50">
+                        <TableRow className="border-b border-blue-200">
+                          <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap w-32">Action</TableHead>
+                          <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Serial No</TableHead>
+                          <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Reg ID</TableHead>
+                          <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Beneficiary Name</TableHead>
+                          <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Father's Name</TableHead>
+                          <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Village</TableHead>
+                          <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Block</TableHead>
+                          <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">District</TableHead>
+                          <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Category</TableHead>
+                          <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Pump Source</TableHead>
+                          <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Pump Type</TableHead>
+                          <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Company</TableHead>
+                          <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {pendingItems.map((item) => (
+                          <TableRow key={item.serialNo}>
+                            <TableCell>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleActionClick(item)}
+                                className="flex items-center gap-1"
+                              >
+                                <Pencil className="h-4 w-4" />
+                                Process
+                              </Button>
+                            </TableCell>
+                            <TableCell className="font-medium">{item.serialNo}</TableCell>
+                            <TableCell>{item.regId}</TableCell>
+                            <TableCell>{item.beneficiaryName}</TableCell>
+                            <TableCell>{item.fatherName}</TableCell>
+                            <TableCell>{item.village}</TableCell>
+                            <TableCell>{item.block}</TableCell>
+                            <TableCell>{item.district}</TableCell>
+                            <TableCell>{item.category}</TableCell>
+                            <TableCell>{item.pumpSource}</TableCell>
+                            <TableCell>{item.pumpType}</TableCell>
+                            <TableCell>{item.company}</TableCell>
+                            <TableCell>
+                              <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
+                                Pending
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  {/* Mobile View */}
+                  <div className="md:hidden space-y-4">
+                    {pendingItems.map((item) => (
+                      <Card key={item.serialNo} className="bg-white border text-sm">
+                        <CardContent className="p-4 space-y-3">
+                          <div className="flex justify-between items-start">
+                            <div className="space-y-1">
+                              <span className="font-bold text-blue-900 block text-xs tracking-wider">#{item.serialNo}</span>
+                              <h4 className="font-semibold text-base">{item.beneficiaryName}</h4>
+                              <p className="text-muted-foreground text-xs">{item.regId}</p>
+                            </div>
+                            <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 text-xs">
                               Pending
                             </Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs border-t border-b py-3 my-2 border-gray-100">
+                            <div className="flex flex-col">
+                              <span className="text-muted-foreground text-[10px] uppercase">Father's Name</span>
+                              <span className="font-medium">{item.fatherName}</span>
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-muted-foreground text-[10px] uppercase">Company</span>
+                              <span className="font-medium">{item.company}</span>
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-muted-foreground text-[10px] uppercase">Village</span>
+                              <span className="font-medium">{item.village}</span>
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-muted-foreground text-[10px] uppercase">District</span>
+                              <span className="font-medium">{item.district}</span>
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-muted-foreground text-[10px] uppercase">Pump Type</span>
+                              <span className="font-medium">{item.pumpType}</span>
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-muted-foreground text-[10px] uppercase">Category</span>
+                              <span className="font-medium">{item.category}</span>
+                            </div>
+                          </div>
+
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleActionClick(item)}
+                            className="w-full bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 hover:text-blue-800"
+                          >
+                            <Pencil className="h-4 w-4 mr-2" />
+                            Process Application
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>
@@ -233,70 +292,121 @@ export default function LoiMrPage() {
                   No processed records yet.
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader className="bg-gradient-to-r from-blue-50 to-cyan-50">
-                      <TableRow className="border-b border-blue-200">
-                        <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Serial No</TableHead>
-                        <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Reg ID</TableHead>
-                        <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Beneficiary Name</TableHead>
-                        <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Father's Name</TableHead>
-                        <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Village</TableHead>
-                        <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Block</TableHead>
-                        <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">District</TableHead>
-                        <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Category</TableHead>
-                        <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Pump Source</TableHead>
-                        <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Pump Type</TableHead>
-                        <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Company</TableHead>
-                        <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Installer</TableHead>
-                        <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Other Remark</TableHead>
-                        <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">LOI Document</TableHead>
-                        <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">MR No</TableHead>
-                        <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">MR Date</TableHead>
-                        <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Amount</TableHead>
-                        <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Paid By</TableHead>
-                        <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Beneficiary Share</TableHead>
-                        <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {historyItems.map((item) => (
-                        <TableRow key={item.serialNo}>
-                          <TableCell className="font-medium whitespace-nowrap">{item.serialNo}</TableCell>
-                          <TableCell className="whitespace-nowrap">{item.regId}</TableCell>
-                          <TableCell className="whitespace-nowrap">{item.beneficiaryName}</TableCell>
-                          <TableCell className="whitespace-nowrap">{item.fatherName}</TableCell>
-                          <TableCell className="whitespace-nowrap">{item.village}</TableCell>
-                          <TableCell className="whitespace-nowrap">{item.block}</TableCell>
-                          <TableCell className="whitespace-nowrap">{item.district}</TableCell>
-                          <TableCell className="whitespace-nowrap">{item.category}</TableCell>
-                          <TableCell className="whitespace-nowrap">{item.pumpSource}</TableCell>
-                          <TableCell className="whitespace-nowrap">{item.pumpType}</TableCell>
-                          <TableCell className="whitespace-nowrap">{item.company}</TableCell>
-                          <TableCell className="whitespace-nowrap">{item.installer || "-"}</TableCell>
-                          <TableCell className="whitespace-nowrap">{item.otherRemark || "-"}</TableCell>
-                          <TableCell className="whitespace-nowrap">
-                            {item.loiFileName ? (
-                              <span className="text-blue-600 underline text-xs cursor-pointer">
-                                {item.loiFileName}
-                              </span>
-                            ) : (
-                              "-"
-                            )}
-                          </TableCell>
-                          <TableCell className="whitespace-nowrap">{item.mrNo || "-"}</TableCell>
-                          <TableCell className="whitespace-nowrap">{item.mrDate || "-"}</TableCell>
-                          <TableCell className="whitespace-nowrap">₹{item.amount || "0"}</TableCell>
-                          <TableCell className="whitespace-nowrap">{item.paidBy || "-"}</TableCell>
-                          <TableCell className="whitespace-nowrap">{item.beneficiaryShare || "-"}</TableCell>
-                          <TableCell className="whitespace-nowrap">
-                            <Badge className="bg-green-100 text-green-800">Processed</Badge>
-                          </TableCell>
+                <>
+                  <div className="hidden md:block overflow-x-auto">
+                    <Table>
+                      <TableHeader className="bg-gradient-to-r from-blue-50 to-cyan-50">
+                        <TableRow className="border-b border-blue-200">
+                          <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Serial No</TableHead>
+                          <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Reg ID</TableHead>
+                          <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Beneficiary Name</TableHead>
+                          <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Father's Name</TableHead>
+                          <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Village</TableHead>
+                          <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Block</TableHead>
+                          <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">District</TableHead>
+                          <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Category</TableHead>
+                          <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Pump Source</TableHead>
+                          <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Pump Type</TableHead>
+                          <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Company</TableHead>
+                          <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Installer</TableHead>
+                          <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Other Remark</TableHead>
+                          <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">LOI Document</TableHead>
+                          <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">MR No</TableHead>
+                          <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">MR Date</TableHead>
+                          <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Amount</TableHead>
+                          <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Paid By</TableHead>
+                          <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Beneficiary Share</TableHead>
+                          <TableHead className="h-12 px-6 py-4 text-xs font-bold text-blue-900 uppercase tracking-wider whitespace-nowrap">Status</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                      </TableHeader>
+                      <TableBody>
+                        {historyItems.map((item) => (
+                          <TableRow key={item.serialNo}>
+                            <TableCell className="font-medium whitespace-nowrap">{item.serialNo}</TableCell>
+                            <TableCell className="whitespace-nowrap">{item.regId}</TableCell>
+                            <TableCell className="whitespace-nowrap">{item.beneficiaryName}</TableCell>
+                            <TableCell className="whitespace-nowrap">{item.fatherName}</TableCell>
+                            <TableCell className="whitespace-nowrap">{item.village}</TableCell>
+                            <TableCell className="whitespace-nowrap">{item.block}</TableCell>
+                            <TableCell className="whitespace-nowrap">{item.district}</TableCell>
+                            <TableCell className="whitespace-nowrap">{item.category}</TableCell>
+                            <TableCell className="whitespace-nowrap">{item.pumpSource}</TableCell>
+                            <TableCell className="whitespace-nowrap">{item.pumpType}</TableCell>
+                            <TableCell className="whitespace-nowrap">{item.company}</TableCell>
+                            <TableCell className="whitespace-nowrap">{item.installer || "-"}</TableCell>
+                            <TableCell className="whitespace-nowrap">{item.otherRemark || "-"}</TableCell>
+                            <TableCell className="whitespace-nowrap">
+                              {item.loiFileName ? (
+                                <span className="text-blue-600 underline text-xs cursor-pointer">
+                                  {item.loiFileName}
+                                </span>
+                              ) : (
+                                "-"
+                              )}
+                            </TableCell>
+                            <TableCell className="whitespace-nowrap">{item.mrNo || "-"}</TableCell>
+                            <TableCell className="whitespace-nowrap">{item.mrDate || "-"}</TableCell>
+                            <TableCell className="whitespace-nowrap">₹{item.amount || "0"}</TableCell>
+                            <TableCell className="whitespace-nowrap">{item.paidBy || "-"}</TableCell>
+                            <TableCell className="whitespace-nowrap">{item.beneficiaryShare || "-"}</TableCell>
+                            <TableCell className="whitespace-nowrap">
+                              <Badge className="bg-green-100 text-green-800">Processed</Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  {/* Mobile View History */}
+                  <div className="md:hidden space-y-4">
+                    {historyItems.map((item) => (
+                      <Card key={item.serialNo} className="bg-white border text-sm shadow-sm">
+                        <CardContent className="p-4 space-y-3">
+                          <div className="flex justify-between items-start">
+                            <div className="space-y-1">
+                              <span className="font-bold text-blue-900 block text-xs tracking-wider">#{item.serialNo}</span>
+                              <h4 className="font-semibold text-base">{item.beneficiaryName}</h4>
+                              <p className="text-muted-foreground text-xs">{item.regId}</p>
+                            </div>
+                            <Badge className="bg-green-100 text-green-800 text-xs">Processed</Badge>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs border-t border-b py-3 my-2 border-gray-100">
+                            <div className="flex flex-col">
+                              <span className="text-muted-foreground text-[10px] uppercase">MR No</span>
+                              <span className="font-medium">{item.mrNo || '-'}</span>
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-muted-foreground text-[10px] uppercase">MR Date</span>
+                              <span className="font-medium">{item.mrDate || '-'}</span>
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-muted-foreground text-[10px] uppercase">Amount</span>
+                              <span className="font-medium">₹{item.amount || '0'}</span>
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-muted-foreground text-[10px] uppercase">Installer</span>
+                              <span className="font-medium">{item.installer || '-'}</span>
+                            </div>
+                            <div className="col-span-2">
+                              <span className="text-muted-foreground text-[10px] uppercase block mb-1">LOI Document</span>
+                              {item.loiFileName ? (
+                                <span className="text-blue-600 underline cursor-pointer">{item.loiFileName}</span>
+                              ) : (
+                                <span className="text-gray-400 italic">No document</span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="bg-gray-50 p-2 rounded text-xs text-gray-600">
+                            <span className="font-semibold">Note:</span> {item.otherRemark || "No remarks"}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>
