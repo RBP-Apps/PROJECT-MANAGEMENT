@@ -28,6 +28,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Hammer, Upload, FileCheck, Pencil, CheckCircle2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export default function FoundationPage() {
   const [activeTab, setActiveTab] = useState("pending");
@@ -37,6 +38,24 @@ export default function FoundationPage() {
   const [selectedItem, setSelectedItem] = useState(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [selectedRows, setSelectedRows] = useState([]);
+  const [isBulk, setIsBulk] = useState(false);
+
+  const handleSelectAll = (checked) => {
+    if (checked) {
+      setSelectedRows(pendingItems.map(item => item.serialNo))
+    } else {
+      setSelectedRows([])
+    }
+  }
+
+  const handleSelectRow = (serialNo, checked) => {
+    if (checked) {
+      setSelectedRows(prev => [...prev, serialNo])
+    } else {
+      setSelectedRows(prev => prev.filter(id => id !== serialNo))
+    }
+  }
   const [formData, setFormData] = useState({
     fdMaterialAgeing: "",
     fdMaterialReceivingDate: "",
@@ -272,6 +291,23 @@ export default function FoundationPage() {
 
   const handleActionClick = (item) => {
     setSelectedItem(item);
+    setIsBulk(false);
+    setIsSuccess(false);
+    setFormData({
+      fdMaterialAgeing: "",
+      fdMaterialReceivingDate: "",
+      challanLink: null,
+      foundationStatus: "",
+      foundationCompletionDate: "",
+      fdPhotoOkDate: "",
+    });
+    setIsDialogOpen(true);
+  };
+
+  const handleBulkClick = () => {
+    if (selectedRows.length < 2) return;
+    setSelectedItem(null);
+    setIsBulk(true);
     setIsSuccess(false);
     setFormData({
       fdMaterialAgeing: "",
@@ -317,7 +353,7 @@ export default function FoundationPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async () => {
-    if (!selectedItem) return;
+    if (!selectedItem && !isBulk) return;
     setIsSubmitting(true);
 
     try {
@@ -326,56 +362,19 @@ export default function FoundationPage() {
 
       if (!scriptUrl) throw new Error("Script URL missing");
 
-      // ✅ STEP 1: Sparse update object
-      const rowUpdate = {};
-
-      const addToUpdate = (key, value) => {
-        const idx = columnMapping[key];
-        if (idx !== undefined && idx >= 0 && value !== undefined && value !== null && value !== "") {
-          rowUpdate[idx] = value;
-        }
-      };
-
-      // ✅ ONLY fields edited in this page
-      addToUpdate("fdMaterialAgeing", formData.fdMaterialAgeing);
-      addToUpdate("fdMaterialReceivingDate", formData.fdMaterialReceivingDate);
-      addToUpdate("foundationStatus", formData.foundationStatus);
-      addToUpdate("foundationCompletionDate", formData.foundationCompletionDate);
-      addToUpdate("fdPhotoOkDate", formData.fdPhotoOkDate);
-
-      // ✅ Actual3 timestamp (Foundation Done)
-      const now = new Date();
-      const timestamp =
-        `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, "0")}/${String(
-          now.getDate()
-        ).padStart(2, "0")} ` +
-        `${String(now.getHours()).padStart(2, "0")}:${String(
-          now.getMinutes()
-        ).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
-
-      addToUpdate("actual3", timestamp);
-
       let finalFileUrl = "";
 
-      // ✅ STEP 2: Upload Challan File if exists
+      // ✅ STEP 1: Upload Challan File if exists (Once for all if bulk)
       if (formData.challanFileObj) {
         const base64 = await getBase64(formData.challanFileObj);
-
-        // Use the env variable for folder ID, fallback to the hardcoded one if needed, 
-        // but prefer the env var as per other pages.
-        const DRIVE_FOLDER_ID = import.meta.env.VITE_DRIVE_DOC_FOLDER_ID; 
-
-        if (!DRIVE_FOLDER_ID) {
-            console.error("VITE_DRIVE_DOC_FOLDER_ID is missing in .env");
-            // You might want to throw an error or alert here
-        }
+        const DRIVE_FOLDER_ID = import.meta.env.VITE_DRIVE_DOC_FOLDER_ID;
 
         const uploadBody = new URLSearchParams({
           action: "uploadFile",
           base64Data: base64,
           fileName: formData.challanFileObj.name,
           mimeType: formData.challanFileObj.type,
-          folderId: DRIVE_FOLDER_ID || "1pqyJUlUD0zwnojUvNezJgxzim8gjUfmM", // Fallback only if env is missing
+          folderId: DRIVE_FOLDER_ID || "1pqyJUlUD0zwnojUvNezJgxzim8gjUfmM",
         });
 
         const upRes = await fetch(scriptUrl, { method: "POST", body: uploadBody });
@@ -388,47 +387,63 @@ export default function FoundationPage() {
         }
       }
 
-      // ✅ STEP 3: Add link to update object
-      if (finalFileUrl) {
-        addToUpdate("challanLink", finalFileUrl);
-      }
+      // ✅ STEP 2: Prepare items to process
+      const itemsToProcess = isBulk 
+        ? pendingItems.filter(item => selectedRows.includes(item.serialNo))
+        : [selectedItem];
 
-      // ✅ STEP 4: Final update call
-      const updatePayload = new URLSearchParams({
-        action: "update",
-        sheetName: "Project Main", // Ensure this matches the sheet name expected by Apps Script
-        id: sheetId,
-        rowIndex: selectedItem.rowIndex,
-        rowData: JSON.stringify(rowUpdate),
+      // ✅ Actual3 timestamp (Foundation Done) - Calculate once
+      const now = new Date();
+      const timestamp =
+        `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, "0")}/${String(
+          now.getDate()
+        ).padStart(2, "0")} ` +
+        `${String(now.getHours()).padStart(2, "0")}:${String(
+          now.getMinutes()
+        ).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
+
+      const updatePromises = itemsToProcess.map(async (item) => {
+          const rowUpdate = {};
+
+          const addToUpdate = (key, value) => {
+            const idx = columnMapping[key];
+            if (idx !== undefined && idx >= 0 && value !== undefined && value !== null && value !== "") {
+              rowUpdate[idx] = value;
+            }
+          };
+
+          // ✅ ONLY fields edited in this page
+          addToUpdate("fdMaterialAgeing", formData.fdMaterialAgeing);
+          addToUpdate("fdMaterialReceivingDate", formData.fdMaterialReceivingDate);
+          addToUpdate("foundationStatus", formData.foundationStatus);
+          addToUpdate("foundationCompletionDate", formData.foundationCompletionDate);
+          addToUpdate("fdPhotoOkDate", formData.fdPhotoOkDate);
+          addToUpdate("actual3", timestamp);
+
+          if (finalFileUrl) {
+            addToUpdate("challanLink", finalFileUrl);
+          }
+
+          const payload = new URLSearchParams({
+            action: "update",
+            sheetName: "Project Main",
+            id: sheetId,
+            rowIndex: item.rowIndex,
+            rowData: JSON.stringify(rowUpdate),
+          });
+
+          return fetch(scriptUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: payload.toString(),
+          });
       });
 
-      const response = await fetch(scriptUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: updatePayload.toString(),
-      });
+      await Promise.all(updatePromises);
+      await fetchData();
+      setIsSuccess(true);
+      if (isBulk) setSelectedRows([]);
 
-      const textResult = await response.text();
-      let result;
-      try {
-        result = JSON.parse(textResult);
-      } catch (e) {
-        if (textResult.includes("undefined") || textResult.trim() === "") {
-           // Optimistic success
-          await fetchData();
-          setIsSuccess(true);
-          return;
-        }
-        alert("Server Error: " + textResult);
-        return;
-      }
-
-      if (result.status === "success" || result.success === true) {
-        await fetchData();
-        setIsSuccess(true);
-      } else {
-        alert("Update Failed: " + (result.message || result.error));
-      }
     } catch (error) {
       console.error("Submission error:", error);
       alert("Failed to submit data: " + error.message);
@@ -438,7 +453,7 @@ export default function FoundationPage() {
   };
 
   return (
-    <div className="space-y-8 p-6 md:p-8 max-w-[1600px] mx-auto bg-slate-50/50 min-h-screen">
+    <div className="space-y-8 p-6 md:p-8 max-w-[1600px] mx-auto bg-slate-50/50 min-h-screen animate-fade-in-up">
 
 
       <Tabs
@@ -480,19 +495,34 @@ export default function FoundationPage() {
                   </div>
                   Pending Foundation
                 </CardTitle>
-                <Badge
-                  variant="outline"
-                  className="bg-yellow-100 text-yellow-700 border-yellow-200 px-3 py-1"
-                >
-                  {pendingItems.length} Pending
-                </Badge>
+                <div className="flex items-center gap-3">
+                  {selectedRows.length >= 2 && (
+                    <Button 
+                      onClick={handleBulkClick}
+                      className="bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-200 transition-all duration-300 animate-in fade-in slide-in-from-right-4"
+                      size="sm"
+                    >
+                      <Pencil className="h-4 w-4 mr-2" />
+                      Foundation Selected ({selectedRows.length})
+                    </Button>
+                  )}
+                  <Badge
+                    variant="outline"
+                    className="bg-yellow-100 text-yellow-700 border-yellow-200 px-3 py-1"
+                  >
+                    {pendingItems.length} Pending
+                  </Badge>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="hidden md:block overflow-x-auto">
+              <div className="overflow-x-auto">
                 <Table className="[&_th]:text-center [&_td]:text-center">
                   <TableHeader className="bg-gradient-to-r from-blue-50/50 to-cyan-50/50">
                     <TableRow className="border-b border-blue-100 hover:bg-transparent">
+                      <TableHead className="h-14 px-4 text-xs font-bold text-slate-600 uppercase tracking-wider whitespace-nowrap w-12">
+                        Select
+                      </TableHead>
                       <TableHead className="h-14 px-6 text-xs font-bold text-slate-600 uppercase tracking-wider whitespace-nowrap min-w-[150px]">
                         Action
                       </TableHead>
@@ -593,12 +623,23 @@ export default function FoundationPage() {
                           key={item.serialNo}
                           className="hover:bg-blue-50/30 transition-colors"
                         >
+                          <TableCell className="px-4">
+                            <div className="flex justify-center">
+                              <Checkbox 
+                                checked={selectedRows.includes(item.serialNo)}
+                                onCheckedChange={(checked) => handleSelectRow(item.serialNo, checked)}
+                                aria-label={`Select row ${item.serialNo}`}
+                                className="checkbox-3d border-slate-400 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 h-5 w-5 shadow-sm transition-all duration-300 ease-out active:scale-75 hover:scale-110 data-[state=checked]:scale-110"
+                              />
+                            </div>
+                          </TableCell>
                           <TableCell>
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => handleActionClick(item)}
-                              className="bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white border border-blue-200 shadow-xs text-xs font-semibold h-8 px-4 rounded-full flex items-center gap-2 transition-all duration-300 mx-auto"
+                              disabled={selectedRows.length >= 2}
+                              className="bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white border border-blue-200 shadow-xs text-xs font-semibold h-8 px-4 rounded-full flex items-center gap-2 transition-all duration-300 mx-auto disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               <Hammer className="h-3.5 w-3.5" />
                               Process
@@ -755,7 +796,8 @@ export default function FoundationPage() {
 
                       <Button
                         size="sm"
-                        className="w-full bg-linear-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white shadow-md"
+                        disabled={selectedRows.length >= 2}
+                        className="w-full bg-linear-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                         onClick={() => handleActionClick(item)}
                       >
                         <Hammer className="h-4 w-4 mr-2" />
@@ -792,7 +834,7 @@ export default function FoundationPage() {
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="hidden md:block overflow-x-auto">
+              <div className="overflow-x-auto">
                 <Table className="[&_th]:text-center [&_td]:text-center">
                   <TableHeader className="bg-gradient-to-r from-blue-50/50 to-cyan-50/50">
                     <TableRow className="border-b border-blue-100 hover:bg-transparent">
@@ -1011,8 +1053,16 @@ export default function FoundationPage() {
                               <span className="text-slate-400">-</span>
                             )}
                           </TableCell>
-                          <TableCell className="whitespace-nowrap bg-green-50/50 text-green-700 font-bold">
-                            {item.foundationStatus}
+                          <TableCell className="whitespace-nowrap bg-green-50/50 font-bold">
+                            <Badge variant="outline" className={`
+                              ${item.foundationStatus === 'Completed' ? 'bg-green-100 text-green-700 border-green-200' : ''}
+                              ${item.foundationStatus === 'In Progress' ? 'bg-blue-100 text-blue-700 border-blue-200' : ''}
+                              ${item.foundationStatus === 'Pending' ? 'bg-yellow-100 text-yellow-700 border-yellow-200' : ''}
+                              ${item.foundationStatus === 'On Hold' ? 'bg-red-100 text-red-700 border-red-200' : ''}
+                              ${!['Completed', 'In Progress', 'Pending', 'On Hold'].includes(item.foundationStatus) ? 'bg-slate-100 text-slate-700 border-slate-200' : ''}
+                            `}>
+                              {item.foundationStatus}
+                            </Badge>
                           </TableCell>
                           <TableCell className="whitespace-nowrap bg-green-50/30 text-slate-700">
                             {item.foundationCompletionDate}
@@ -1065,9 +1115,17 @@ export default function FoundationPage() {
                           <span className="text-slate-400 text-[10px] uppercase font-semibold">
                             Status
                           </span>
-                          <span className="font-medium text-green-700">
-                            {item.foundationStatus}
-                          </span>
+                          <div className="flex flex-wrap gap-1">
+                             <Badge variant="outline" className={`
+                              ${item.foundationStatus === 'Completed' ? 'bg-green-100 text-green-700 border-green-200' : ''}
+                              ${item.foundationStatus === 'In Progress' ? 'bg-blue-100 text-blue-700 border-blue-200' : ''}
+                              ${item.foundationStatus === 'Pending' ? 'bg-yellow-100 text-yellow-700 border-yellow-200' : ''}
+                              ${item.foundationStatus === 'On Hold' ? 'bg-red-100 text-red-700 border-red-200' : ''}
+                              ${!['Completed', 'In Progress', 'Pending', 'On Hold'].includes(item.foundationStatus) ? 'bg-slate-100 text-slate-700 border-slate-200' : ''}
+                            `}>
+                              {item.foundationStatus}
+                            </Badge>
+                          </div>
                         </div>
                         <div className="flex flex-col gap-1">
                           <span className="text-slate-400 text-[10px] uppercase font-semibold">
@@ -1125,253 +1183,227 @@ export default function FoundationPage() {
 
       {/* FOUNDATION DIALOG */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-      <DialogContent className={`max-w-4xl max-h-[90vh] overflow-y-auto p-0 gap-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] ${isSuccess ? "bg-transparent shadow-none border-none" : ""}`}>
-        {isSuccess ? (
-            <div className="flex flex-col items-center justify-center w-full p-8 text-center space-y-6 animate-in fade-in duration-300">
+          <DialogContent showCloseButton={!isSuccess} className={`max-w-4xl max-h-[90vh] overflow-y-auto p-0 gap-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] ${isSuccess ? "bg-transparent !shadow-none !border-none" : ""}`}>
+            {isSuccess ? (
+              <div className="flex flex-col items-center justify-center w-full p-8 text-center space-y-6 animate-in fade-in duration-300">
                 <div className="rounded-full bg-white p-5 shadow-2xl shadow-white/20 ring-8 ring-white/10 animate-in zoom-in duration-500 ease-out">
-                    <CheckCircle2 className="h-16 w-16 text-green-600 scale-110" />
+                  <CheckCircle2 className="h-16 w-16 text-green-600 scale-110" />
                 </div>
                 <h2 className="text-3xl font-bold text-white drop-shadow-md animate-in slide-in-from-bottom-4 fade-in duration-500 delay-150 ease-out tracking-wide">
-                    Completed Foundation Successfully!
+                  Submitted Successfully!
                 </h2>
-            </div>
-        ) : (
-            <>
-          <DialogHeader className="p-6 pb-2 border-b border-blue-100 bg-blue-50/30">
-            <DialogTitle className="text-xl font-bold bg-linear-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent flex items-center gap-2">
-              <span className="bg-blue-100 p-1.5 rounded-md">
-                <Hammer className="h-4 w-4 text-blue-600" />
-              </span>
-              Process Foundation Work
-            </DialogTitle>
-            <DialogDescription className="text-slate-500 ml-10">
-              Update foundation details for{" "}
-              <span className="font-semibold text-slate-700">
-                {selectedItem?.beneficiaryName}
-              </span>{" "}
-              <span className="font-mono text-xs bg-slate-100 px-1 py-0.5 rounded text-slate-600">
-                {selectedItem?.serialNo}
-              </span>
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="p-6 space-y-6">
-            {selectedItem && (
+              </div>
+            ) : (
               <>
-                {/* PREFILLED BENEFICIARY DETAILS CARD */}
-                <div className="bg-slate-50/50 rounded-xl border border-slate-200 p-4">
-                  <h3 className="text-sm font-semibold text-slate-800 mb-3 flex items-center gap-2">
-                    <FileCheck className="h-4 w-4 text-blue-600" />
-                    Beneficiary Details
-                  </h3>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-y-4 gap-x-8 text-sm">
-                    <div>
-                      <span className="text-slate-500 text-xs block mb-1">
-                        Serial No
-                      </span>
-                      <p className="font-medium text-slate-800">
-                        {selectedItem.serialNo}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 text-xs block mb-1">
-                        Reg ID
-                      </span>
-                      <p className="font-medium text-slate-800 font-mono">
-                        {selectedItem.regId}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 text-xs block mb-1">
-                        Beneficiary Name
-                      </span>
-                      <p className="font-medium text-slate-800">
-                        {selectedItem.beneficiaryName}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 text-xs block mb-1">
-                        Father's Name
-                      </span>
-                      <p className="font-medium text-slate-800">
-                        {selectedItem.fatherName}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 text-xs block mb-1">
-                        Village/Block
-                      </span>
-                      <p className="font-medium text-slate-800">
-                        {selectedItem.village}, {selectedItem.block}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 text-xs block mb-1">
-                        Pump Type
-                      </span>
-                      <p className="font-medium text-blue-700 bg-blue-50 inline-block px-2 py-0.5 rounded text-xs border border-blue-100">
-                        {selectedItem.pumpType}
-                      </p>
-                    </div>
-                  </div>
-                </div>
+                <DialogHeader className="p-6 pb-2 border-b border-blue-100 bg-blue-50/30">
+                  <DialogTitle className="text-xl font-bold bg-linear-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent flex items-center gap-2">
+                    <span className="bg-blue-100 p-1.5 rounded-md">
+                      <Hammer className="h-4 w-4 text-blue-600" />
+                    </span>
+                    Process Foundation Work
+                  </DialogTitle>
+                  <DialogDescription className="text-slate-500 ml-10">
+                    {isBulk ? (
+                        <span>Applying changes to <span className="font-bold text-blue-700">{selectedRows.length} selected items</span>. All fields below will be updated for these items.</span>
+                    ) : (
+                        <span>Processing foundation for <span className="font-semibold text-slate-700">{selectedItem?.beneficiaryName}</span> <span className="font-mono text-xs bg-slate-100 px-1 py-0.5 rounded text-slate-600 border border-slate-200">{selectedItem?.serialNo}</span></span>
+                    )}
+                  </DialogDescription>
+                </DialogHeader>
 
-                {/* FOUNDATION INPUT FORM */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium text-slate-700">
-                      FD Material Ageing
-                    </Label>
-                    <Input
-                      value={formData.fdMaterialAgeing}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          fdMaterialAgeing: e.target.value,
-                        })
-                      }
-                      placeholder="e.g. 30 days"
-                      className="h-10 border-slate-200 focus:border-cyan-400 focus-visible:ring-cyan-100 transition-all"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium text-slate-700">
-                      FD Material Receiving Date
-                    </Label>
-                    <Input
-                      type="date"
-                      value={formData.fdMaterialReceivingDate}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          fdMaterialReceivingDate: e.target.value,
-                        })
-                      }
-                      className="h-10 border-slate-200 focus:border-cyan-400 focus-visible:ring-cyan-100 transition-all"
-                    />
-                  </div>
-
-                  <div className="space-y-2 md:col-span-2">
-                    <Label className="text-sm font-medium text-slate-700">
-                      Challan Link
-                    </Label>
-                    <div
-                      className="border-2 border-dashed border-slate-200 rounded-xl p-4 bg-slate-50/50 flex flex-col items-center justify-center gap-2 hover:bg-slate-50 transition-colors cursor-pointer group"
-                      onClick={() =>
-                        document.getElementById("challan-file")?.click()
-                      }
-                    >
-                      <Input
-                        type="file"
-                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                        onChange={handleFileUpload}
-                        className="hidden"
-                        id="challan-file"
-                      />
-                      <div className="p-3 bg-white rounded-full shadow-sm group-hover:scale-110 transition-transform">
-                        <Upload className="h-5 w-5 text-cyan-600" />
-                      </div>
-                      <div className="text-center">
-                        <span className="text-sm font-medium text-slate-700 group-hover:text-cyan-700 transition-colors">
-                          {formData.challanLink
-                            ? "Change Document"
-                            : "Click to upload Challan"}
+                {(selectedItem || isBulk) && (<>
+                  <div className="p-6 space-y-6">
+                    {/* READ ONLY INFO (Hide in Bulk Mode) */}
+                    {!isBulk && selectedItem && (
+                    <div className="rounded-xl border border-blue-100 bg-linear-to-br from-blue-50/50 to-cyan-50/30 p-5 shadow-sm">
+                      <h3 className="text-sm font-bold text-blue-900 mb-4 flex items-center gap-2 border-b border-blue-100 pb-2">
+                        <span className="bg-white p-1 rounded shadow-sm">
+                          <CheckCircle2 className="h-4 w-4 text-blue-500" />
                         </span>
-                        <p className="text-xs text-slate-400 mt-1">
-                          SVG, PNG, JPG or PDF (max. 10MB)
-                        </p>
+                        BENEFICIARY DETAILS
+                      </h3>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-y-5 gap-x-6">
+                        <div className="space-y-1">
+                          <span className="text-[10px] uppercase font-bold text-blue-900/60 block mb-1">
+                            Reg ID
+                          </span>
+                          <div className="font-medium text-slate-700 font-mono bg-white/50 px-2 py-1 rounded border border-blue-100/50 inline-block">
+                            {selectedItem.regId}
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <span className="text-[10px] uppercase font-bold text-blue-900/60 block mb-1">
+                            Father's Name
+                          </span>
+                          <p className="font-medium text-slate-700">
+                            {selectedItem.fatherName}
+                          </p>
+                        </div>
+                        <div className="space-y-1">
+                          <span className="text-[10px] uppercase font-bold text-blue-900/60 block mb-1">
+                            Village & Block
+                          </span>
+                          <p className="font-medium text-slate-700">
+                            {selectedItem.village}, {selectedItem.block}
+                          </p>
+                        </div>
+                        <div className="space-y-1">
+                          <span className="text-[10px] uppercase font-bold text-blue-900/60 block mb-1">
+                            District
+                          </span>
+                          <p className="font-medium text-slate-700">
+                            {selectedItem.district}
+                          </p>
+                        </div>
+                        <div className="space-y-1">
+                          <span className="text-[10px] uppercase font-bold text-blue-900/60 block mb-1">
+                            Sanction No
+                          </span>
+                          <p className="font-medium text-orange-600 font-mono">
+                            {selectedItem.sanctionNo || "-"}
+                          </p>
+                        </div>
+                        <div className="space-y-1">
+                          <span className="text-[10px] uppercase font-bold text-blue-900/60 block mb-1">
+                            Sanction Date
+                          </span>
+                          <p className="font-medium text-slate-700">
+                            {selectedItem.sanctionDate || "-"}
+                          </p>
+                        </div>
                       </div>
-                      {formData.challanLink && (
-                        <Badge
-                          variant="secondary"
-                          className="mt-2 bg-cyan-50 text-cyan-700 border-cyan-200"
-                        >
-                          <FileCheck className="h-3 w-3 mr-1" />
-                          {formData.challanLink}
-                        </Badge>
-                      )}
                     </div>
-                  </div>
+                  )}
 
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium text-slate-700">
-                      Foundation Status
-                    </Label>
-                    <Select
-                      value={formData.foundationStatus}
-                      onValueChange={(value) =>
-                        setFormData({ ...formData, foundationStatus: value })
-                      }
-                    >
-                      <SelectTrigger className="h-10 border-slate-200 focus:border-cyan-400 focus:ring-cyan-100">
-                        <SelectValue placeholder="Select status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem
-                          value="Completed"
-                          className="text-slate-700 focus:bg-cyan-50 focus:text-cyan-700 cursor-pointer"
-                        >
-                          Completed
-                        </SelectItem>
-                        <SelectItem
-                          value="In Progress"
-                          className="text-slate-700 focus:bg-cyan-50 focus:text-cyan-700 cursor-pointer"
-                        >
-                          In Progress
-                        </SelectItem>
-                        <SelectItem
-                          value="Pending"
-                          className="text-slate-700 focus:bg-cyan-50 focus:text-cyan-700 cursor-pointer"
-                        >
-                          Pending
-                        </SelectItem>
-                        <SelectItem
-                          value="On Hold"
-                          className="text-slate-700 focus:bg-cyan-50 focus:text-cyan-700 cursor-pointer"
-                        >
-                          On Hold
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                    {/* FORM */}
+                    <div className="space-y-6">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="h-5 w-1 bg-cyan-500 rounded-full"></div>
+                        <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide">
+                          Work Details
+                        </h3>
+                      </div>
 
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium text-slate-700">
-                      FD Completion Date
-                    </Label>
-                    <Input
-                      type="date"
-                      value={formData.foundationCompletionDate}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          foundationCompletionDate: e.target.value,
-                        })
-                      }
-                      className="h-10 border-slate-200 focus:border-cyan-400 focus-visible:ring-cyan-100 transition-all"
-                    />
-                  </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <Label className="text-sm font-medium text-slate-700">
+                            Material Receiving Date
+                          </Label>
+                          <Input
+                            type="date"
+                            value={formData.fdMaterialReceivingDate}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                fdMaterialReceivingDate: e.target.value,
+                              })
+                            }
+                            className="h-10 border-slate-200 focus:border-cyan-400 focus-visible:ring-cyan-100 transition-all bg-white"
+                          />
+                        </div>
 
-                  <div className="space-y-2 md:col-span-2">
-                    <Label className="text-sm font-medium text-slate-700">
-                      FD Photo OK Date
-                    </Label>
-                    <Input
-                      type="date"
-                      value={formData.fdPhotoOkDate}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          fdPhotoOkDate: e.target.value,
-                        })
-                      }
-                      className="h-10 border-slate-200 focus:border-cyan-400 focus-visible:ring-cyan-100 transition-all"
-                    />
-                  </div>
+                        <div className="space-y-2">
+                          <Label className="text-sm font-medium text-slate-700">
+                            Foundation Completion Date
+                          </Label>
+                          <Input
+                            type="date"
+                            value={formData.foundationCompletionDate}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                foundationCompletionDate: e.target.value,
+                              })
+                            }
+                            className="h-10 border-slate-200 focus:border-cyan-400 focus-visible:ring-cyan-100 transition-all bg-white"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-sm font-medium text-slate-700">
+                            Foundation Status
+                          </Label>
+                          <Select
+                            value={formData.foundationStatus}
+                            onValueChange={(v) =>
+                              setFormData({ ...formData, foundationStatus: v })
+                            }
+                          >
+                            <SelectTrigger className="h-10 border-slate-200 focus:border-cyan-400 focus:ring-cyan-100 bg-white">
+                              <SelectValue placeholder="Select Status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="In Progress" className="text-blue-600 font-medium focus:bg-blue-50 focus:text-blue-700 cursor-pointer">
+                                In Progress
+                              </SelectItem>
+                              <SelectItem value="Completed" className="text-green-600 font-medium focus:bg-green-50 focus:text-green-700 cursor-pointer">
+                                Completed
+                              </SelectItem>
+                              <SelectItem value="On Hold" className="text-red-600 font-medium focus:bg-red-50 focus:text-red-700 cursor-pointer">
+                                On Hold
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-sm font-medium text-slate-700">
+                            Photo OK Date
+                          </Label>
+                          <Input
+                            type="date"
+                            value={formData.fdPhotoOkDate}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                fdPhotoOkDate: e.target.value,
+                              })
+                            }
+                            className="h-10 border-slate-200 focus:border-cyan-400 focus-visible:ring-cyan-100 transition-all bg-white"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label className="text-sm font-medium text-slate-700">Material Ageing (Days)</Label>
+                            <Input
+                                type="number"
+                                value={formData.fdMaterialAgeing}
+                                onChange={(e) => setFormData({ ...formData, fdMaterialAgeing: e.target.value })}
+                                placeholder="0"
+                                className="h-10 border-slate-200 focus:border-cyan-400 focus-visible:ring-cyan-100 transition-all bg-white"
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-sm font-medium text-slate-700">
+                            Upload Challan
+                          </Label>
+                          <div
+                            className="border-2 border-dashed border-slate-200 rounded-xl p-3 bg-slate-50/50 flex flex-col items-center justify-center gap-1 hover:bg-slate-50 transition-all cursor-pointer group border-blue-100/50 hover:border-blue-200 h-24"
+                            onClick={() =>
+                              document.getElementById("challan-file")?.click()
+                            }
+                          >
+                            <div className="h-8 w-8 bg-white rounded-full flex items-center justify-center shadow-sm border border-slate-100 group-hover:scale-110 transition-transform">
+                              <Upload className="h-4 w-4 text-blue-500" />
+                            </div>
+                            <span className="text-xs font-medium text-slate-600 group-hover:text-blue-600 transition-colors w-full text-center truncate px-2">
+                              {formData.challanLink || "Click to Upload"}
+                            </span>
+                            <Input
+                              type="file"
+                              accept=".pdf,.jpg,.jpeg,.png"
+                              onChange={handleFileUpload}
+                              className="hidden"
+                              id="challan-file"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                 </div>
 
-                <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+                <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 pb-6 pr-6">
                   <Button
                     variant="ghost"
                     onClick={() => setIsDialogOpen(false)}
@@ -1388,11 +1420,10 @@ export default function FoundationPage() {
                     {isSubmitting ? "Processing..." : "Complete Foundation"}
                   </Button>
                 </div>
+                  </>
+                )}
               </>
             )}
-          </div>
-        </>
-      )}
       </DialogContent>
       </Dialog>
     </div>

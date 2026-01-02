@@ -20,7 +20,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { CreditCard, CheckCircle2, Loader2, Activity, IndianRupee } from "lucide-react";
+import { CreditCard, CheckCircle2, Loader2, Activity, IndianRupee, ClipboardCheck } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export default function PaymentPage() {
   const [activeTab, setActiveTab] = useState("pending");
@@ -32,6 +33,8 @@ export default function PaymentPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [columnMapping, setColumnMapping] = useState({});
+  const [selectedRows, setSelectedRows] = useState([]);
+  const [isBulk, setIsBulk] = useState(false);
   const [formData, setFormData] = useState({
     paymentDate: "",
     paymentAmount: "",
@@ -192,6 +195,7 @@ export default function PaymentPage() {
   }, [isSuccess]);
 
   const handleActionClick = (item) => {
+    setIsBulk(false);
     setSelectedItem(item);
     setIsSuccess(false);
     setFormData({
@@ -205,74 +209,110 @@ export default function PaymentPage() {
     setIsDialogOpen(true);
   };
 
+  const handleSelectAll = (checked) => {
+      if (checked) {
+          setSelectedRows(pendingItems.map((item) => item.serialNo));
+      } else {
+          setSelectedRows([]);
+      }
+  };
+
+  const handleSelectRow = (serialNo, checked) => {
+      if (checked) {
+          setSelectedRows((prev) => [...prev, serialNo]);
+      } else {
+          setSelectedRows((prev) => prev.filter((id) => id !== serialNo));
+      }
+  };
+
+  const handleBulkClick = () => {
+    setIsBulk(true);
+    setSelectedItem(null);
+    setIsSuccess(false);
+    setFormData({
+      paymentDate: "",
+      paymentAmount: "",
+      gst: "",
+      tds: "",
+      sd: "",
+      balance: "",
+    });
+    setIsDialogOpen(true);
+  };
+
   const handleSubmit = async () => {
-    if (!selectedItem) return;
+    if (!selectedItem && (!isBulk || selectedRows.length === 0)) return;
     setIsSubmitting(true);
 
     try {
        const scriptUrl = import.meta.env.VITE_APP_SCRIPT_URL;
        const sheetId = import.meta.env.VITE_SHEET_ID;
 
-       // 2. Prepare Row Update
-       const rowUpdate = {};
-       const addToUpdate = (key, val) => {
-          const idx = columnMapping[key];
-          if (idx !== undefined && idx >= 0) {
-              rowUpdate[idx] = val;
-          }
-       };
-
-       addToUpdate("paymentDate", formData.paymentDate);
-       addToUpdate("paymentAmount", formData.paymentAmount);
-       addToUpdate("gst", formData.gst);
-       addToUpdate("tds", formData.tds);
-       addToUpdate("sd", formData.sd);
-       addToUpdate("balance", formData.balance);
-       
-       // Mark as DONE (Actual9)
-       const now = new Date();
-       const timestamp =
-         `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')} ` +
-         `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
-       
-       addToUpdate("actual9", timestamp);
-
-       // 3. Send Update
-       const updatePayload = new URLSearchParams({
-          action: "update",
-          sheet: "Project Main",
-          sheetName: "Project Main",
-          id: sheetId,
-          rowIndex: selectedItem.rowIndex,
-          rowData: JSON.stringify(rowUpdate),
-       });
-
-       const updateRes = await fetch(scriptUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: updatePayload,
-       });
-
-       const textResult = await updateRes.text();
-       let updateResult;
-
-       try {
-          updateResult = JSON.parse(textResult);
-       } catch (e) {
-          console.warn("JSON Parse Error:", textResult);
-           if (textResult.toLowerCase().includes("success")) {
-             updateResult = { status: "success" };
-          } else {
-             throw new Error("Invalid server response");
-          }
+       // 1. Identify Items to Process
+       let itemsToProcess = [];
+       if (isBulk) {
+           itemsToProcess = pendingItems.filter(item => selectedRows.includes(item.serialNo));
+       } else {
+           itemsToProcess = [selectedItem];
        }
 
-        if (updateResult.status === "success" || updateResult.success) {
-           await fetchData();
-           setIsSuccess(true);
-        } else {
-          throw new Error("Update failed: " + JSON.stringify(updateResult));
+       // 2. Process Each Item
+       const updatePromises = itemsToProcess.map(async (item) => {
+          const rowUpdate = {};
+          const addToUpdate = (key, val) => {
+              const idx = columnMapping[key];
+              if (idx !== undefined && idx >= 0) {
+                  rowUpdate[idx] = val;
+              }
+          };
+
+          addToUpdate("paymentDate", formData.paymentDate);
+          addToUpdate("paymentAmount", formData.paymentAmount);
+          addToUpdate("gst", formData.gst);
+          addToUpdate("tds", formData.tds);
+          addToUpdate("sd", formData.sd);
+          addToUpdate("balance", formData.balance);
+          
+          // Mark as DONE (Actual9)
+          const now = new Date();
+          const timestamp =
+            `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')} ` +
+            `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+          
+          addToUpdate("actual9", timestamp);
+
+          // Send Update
+          const updatePayload = new URLSearchParams({
+             action: "update",
+             sheet: "Project Main",
+             sheetName: "Project Main",
+             id: sheetId,
+             rowIndex: item.rowIndex,
+             rowData: JSON.stringify(rowUpdate),
+          });
+
+          const updateRes = await fetch(scriptUrl, {
+             method: "POST",
+             headers: { "Content-Type": "application/x-www-form-urlencoded" },
+             body: updatePayload,
+          });
+
+          return updateRes.json();
+       });
+
+       const results = await Promise.all(updatePromises);
+
+       // Check results
+       const failed = results.filter(r => r.status === 'error' || r.result === 'error');
+       if (failed.length > 0) {
+           throw new Error(`${failed.length} updates failed.`);
        }
+
+       await fetchData();
+       setSelectedItem(null);
+       setIsBulk(false);
+       setSelectedRows([]);
+       setIsSuccess(true);
 
     } catch (error) {
        console.error("Submission Error:", error);
@@ -283,7 +323,7 @@ export default function PaymentPage() {
   };
 
   return (
-    <div className="space-y-8 p-6 md:p-8 max-w-[1600px] mx-auto bg-slate-50/50 min-h-screen">
+    <div className="space-y-8 p-6 md:p-8 max-w-[1600px] mx-auto bg-slate-50/50 min-h-screen animate-fade-in-up">
       <Tabs
         defaultValue="pending"
         className="w-full"
@@ -323,20 +363,35 @@ export default function PaymentPage() {
                   </div>
                   Pending Payments
                 </CardTitle>
-                <Badge
-                  variant="outline"
-                  className="bg-yellow-100 text-yellow-700 border-yellow-200 px-3 py-1"
-                >
-                  {pendingItems.length} Pending
-                </Badge>
+                <div className="flex items-center gap-2">
+                    {selectedRows.length >= 2 && (
+                    <Button
+                      onClick={handleBulkClick}
+                      className="bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-200 transition-all duration-300 animate-in fade-in slide-in-from-right-4"
+                      size="sm"
+                    >
+                      <ClipboardCheck className="h-4 w-4 mr-2" />
+                      Pay Selected ({selectedRows.length})
+                    </Button>
+                  )}
+                  <Badge
+                    variant="outline"
+                    className="bg-yellow-100 text-yellow-700 border-yellow-200 px-3 py-1"
+                  >
+                    {pendingItems.length} Pending
+                  </Badge>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="p-0">
               {/* Desktop Table View */}
-              <div className="hidden lg:block overflow-x-auto">
+              <div className="overflow-x-auto">
                 <Table className="[&_th]:text-center [&_td]:text-center">
                   <TableHeader className="bg-gradient-to-r from-blue-50/50 to-cyan-50/50">
                     <TableRow className="border-b border-blue-100 hover:bg-transparent">
+                      <TableHead className="h-14 px-4 text-xs font-bold text-slate-600 uppercase tracking-wider whitespace-nowrap w-12">
+                          Select
+                      </TableHead>
                       <TableHead className="h-14 px-6 text-xs font-bold text-slate-600 uppercase tracking-wider whitespace-nowrap min-w-[120px]">
                         Action
                       </TableHead>
@@ -397,12 +452,23 @@ export default function PaymentPage() {
                           key={item.serialNo}
                           className="hover:bg-blue-50/30 transition-colors"
                         >
+                          <TableCell className="px-4">
+                            <div className="flex justify-center">
+                              <Checkbox 
+                                checked={selectedRows.includes(item.serialNo)}
+                                onCheckedChange={(checked) => handleSelectRow(item.serialNo, checked)}
+                                aria-label={`Select row ${item.serialNo}`}
+                                className="checkbox-3d border-slate-400 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 h-5 w-5 shadow-sm transition-all duration-300 ease-out active:scale-75 hover:scale-110 data-[state=checked]:scale-110"
+                              />
+                            </div>
+                          </TableCell>
                           <TableCell>
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => handleActionClick(item)}
-                              className="bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white border border-blue-200 shadow-xs text-xs font-semibold h-8 px-4 rounded-full flex items-center gap-2 transition-all duration-300 mx-auto"
+                              disabled={selectedRows.length >= 2}
+                              className="bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white border border-blue-200 shadow-xs text-xs font-semibold h-8 px-4 rounded-full flex items-center gap-2 transition-all duration-300 mx-auto disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               <CreditCard className="h-3.5 w-3.5" />
                               Pay
@@ -513,7 +579,8 @@ export default function PaymentPage() {
 
                       <Button
                         size="sm"
-                        className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white shadow-md"
+                        disabled={selectedRows.length >= 2}
+                        className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                         onClick={() => handleActionClick(item)}
                       >
                         <CreditCard className="h-4 w-4 mr-2" />
@@ -705,7 +772,7 @@ export default function PaymentPage() {
 
       {/* PAYMENT DIALOG */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className={`max-w-4xl max-h-[90vh] overflow-y-auto p-0 gap-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] ${isSuccess ? "bg-transparent shadow-none border-none" : "bg-white"}`}>
+        <DialogContent showCloseButton={!isSuccess} className={`max-w-4xl max-h-[90vh] overflow-y-auto p-0 gap-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] ${isSuccess ? "bg-transparent !shadow-none !border-none" : "bg-white"}`}>
         {isSuccess ? (
             <div className="flex flex-col items-center justify-center w-full p-8 text-center space-y-6 animate-in fade-in duration-300">
                 <div className="rounded-full bg-white p-5 shadow-2xl shadow-green-900/20 ring-8 ring-white/10 animate-in zoom-in duration-500 ease-out relative">
@@ -726,16 +793,18 @@ export default function PaymentPage() {
               Process Payment
             </DialogTitle>
             <DialogDescription className="text-slate-500 ml-10">
-              Enter payment details for{" "}
-              <span className="font-semibold text-slate-700">
-                {selectedItem?.beneficiaryName}
-              </span>
+              {isBulk ? (
+                  <span>Applying changes to <span className="font-bold text-blue-700">{selectedRows.length} selected items</span>. All fields below will be updated for these items.</span>
+              ) : (
+                  <span>Enter payment details for <span className="font-semibold text-slate-700">{selectedItem?.beneficiaryName}</span></span>
+              )}
             </DialogDescription>
           </DialogHeader>
 
-          {selectedItem && (
+          {(selectedItem || isBulk) && (
             <div className="grid gap-6 p-6">
-              {/* BENEFICIARY DETAILS CARD */}
+              {/* BENEFICIARY DETAILS CARD - Hide in Bulk */}
+              {!isBulk && selectedItem && (
               <div className="rounded-xl border border-blue-100 bg-gradient-to-br from-blue-50/50 to-cyan-50/30 p-5 shadow-sm">
                 <div className="flex items-center gap-2 mb-4 pb-2 border-b border-blue-100/50">
                   <span className="bg-white p-1 rounded shadow-sm">
@@ -788,6 +857,7 @@ export default function PaymentPage() {
                   </div>
                 </div>
               </div>
+              )}
 
               {/* PAYMENT INPUT FORM */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -869,12 +939,12 @@ export default function PaymentPage() {
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 pt-6 border-t border-slate-100">
+              <div className="flex justify-end gap-3 pt-6 border-t border-slate-100 pb-6 pr-6">
                 <Button
                   variant="outline"
                   onClick={() => setIsDialogOpen(false)}
                    disabled={isSubmitting}
-                  className="px-6"
+                  className="px-6 bg-white hover:bg-slate-50 text-slate-700 border-slate-200"
                 >
                   Cancel
                 </Button>

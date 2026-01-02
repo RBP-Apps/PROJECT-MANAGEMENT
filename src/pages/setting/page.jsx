@@ -217,18 +217,6 @@ export default function SettingPage() {
        addField(columnMapping.role, formData.role);
        addField(columnMapping.pageAccess, formData.pageAccess.join(", "));
        
-       // Handle Status Column - Explicitly look for it or use fallback
-       // We can't access rawRows here easily to check header again, but we can guess or use hardcoded 5 if needed.
-       // Ideally we added it to colMap in fetchData. Let's assume Status is usually present.
-       // If not in colMap, we try index 5 as fallback from observation.
-       // Let's rely on columnMapping if we can, or just hardcode 5 if we are desperate.
-       // But better: Add 'status' to colMap in fetchData in next iteration if this fails.
-       // For now, let's just assume we append indices.
-       // Actually 'update' action takes { index: val }.
-       
-       // Fallback for Status if not mapped (it wasn't mapped in previous step's colMap except by my comment)
-       // Let's verify if I added it to colMap in Step 185... I did NOT add 'Status' to colMap in Step 185.
-       // So I will guess it is Column F (index 5) based on screenshot.
        rowUpdate[5] = "Active"; 
 
        const params = new URLSearchParams({
@@ -286,8 +274,8 @@ export default function SettingPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-[1600px] mx-auto pb-10">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="space-y-6 max-w-[1600px] mx-auto pb-10 animate-fade-in-up">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-1">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-slate-900">User Management</h1>
           <p className="text-slate-500 mt-1">Manage system users, roles, and access permissions.</p>
@@ -302,7 +290,7 @@ export default function SettingPage() {
       </div>
 
       <Card className="border border-blue-100 shadow-xl shadow-blue-100/20 bg-white/80 backdrop-blur-sm overflow-hidden">
-        <CardHeader className="border-b border-blue-50 bg-blue-50/30 px-6 py-4">
+        <CardHeader className="border-b border-blue-50 bg-blue-50/30 px-6 py-1">
             <CardTitle className="text-lg font-semibold text-blue-900 flex items-center gap-2">
                 <Users className="h-5 w-5 text-blue-600" />
                 Registered Users

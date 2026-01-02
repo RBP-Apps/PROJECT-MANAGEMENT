@@ -15,6 +15,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Pencil, FileCheck, Upload, CheckCircle2 } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
 
 export default function LoiMrPage() {
   const [pendingItems, setPendingItems] = useState([])
@@ -23,6 +24,24 @@ export default function LoiMrPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("pending")
   const [isSuccess, setIsSuccess] = useState(false)
+  const [selectedRows, setSelectedRows] = useState([])
+  const [isBulk, setIsBulk] = useState(false)
+
+  const handleSelectAll = (checked) => {
+    if (checked) {
+      setSelectedRows(pendingItems.map(item => item.serialNo))
+    } else {
+      setSelectedRows([])
+    }
+  }
+
+  const handleSelectRow = (serialNo, checked) => {
+    if (checked) {
+      setSelectedRows(prev => [...prev, serialNo])
+    } else {
+      setSelectedRows(prev => prev.filter(id => id !== serialNo))
+    }
+  }
 
   // Form state for processing
   const [formData, setFormData] = useState({
@@ -274,10 +293,32 @@ setHistoryItems(parsedHistory); // History tab will be empty logic-wise
 
   const handleActionClick = (item) => {
     setSelectedItem(item)
+    setIsBulk(false)
     setIsSuccess(false)
     setFormData({
       beneficiaryName: item.beneficiaryName,
       company: item.company,
+      installer: "",
+      otherRemark: "",
+      loiFileName: null,
+      loiFileObj: null,
+      mrNo: "",
+      mrDate: "",
+      amount: "",
+      paidBy: "",
+      beneficiaryShare: "",
+    })
+    setIsDialogOpen(true)
+  }
+
+  const handleBulkClick = () => {
+    if (selectedRows.length < 2) return
+    setSelectedItem(null)
+    setIsBulk(true)
+    setIsSuccess(false)
+    setFormData({
+      beneficiaryName: "Multiple Beneficiaries",
+      company: "Multiple Companies",
       installer: "",
       otherRemark: "",
       loiFileName: null,
@@ -335,7 +376,7 @@ setHistoryItems(parsedHistory); // History tab will be empty logic-wise
   };
 
   const handleSubmit = async () => {
-    if (!selectedItem) return;
+    if (!selectedItem && !isBulk) return;
     setIsSubmitting(true);
 
     try {
@@ -344,6 +385,7 @@ setHistoryItems(parsedHistory); // History tab will be empty logic-wise
 
       let finalFileUrl = "";
 
+      // 1. Upload File (Once for all if bulk)
       if (formData.loiFileObj) {
         const base64 = await getBase64(formData.loiFileObj);
 
@@ -375,47 +417,52 @@ setHistoryItems(parsedHistory); // History tab will be empty logic-wise
         finalFileUrl = upResult.fileUrl; // ✅ Drive link
       }
 
-      // 2. Prepare Sparse Update (ONLY columns meant to be changed)
-      const rowUpdate = {};
-      const addToUpdate = (key, value) => {
-          const idx = columnMapping[key];
-          // Ensure index is valid and NOT part of the 'Planned' columns (M, X, AD)
-          if (idx !== undefined && idx >= 0 && value !== "") {
-              rowUpdate[idx] = value;
-          }
-      };
+      // 2. Prepare Data Update
+      const itemsToProcess = isBulk 
+        ? pendingItems.filter(item => selectedRows.includes(item.serialNo))
+        : [selectedItem];
 
-      addToUpdate('installer', formData.installer);
-      addToUpdate('beneficiaryShare', formData.beneficiaryShare);
-      addToUpdate('mrNo', formData.mrNo ? `'${formData.mrNo}` : "");
-      addToUpdate('mrDate', formData.mrDate);
-      addToUpdate('amount', formData.amount);
-      addToUpdate('paidBy', formData.paidBy);
-      addToUpdate('otherRemark', formData.otherRemark);
-      addToUpdate('actual1', formatDateTime(new Date()));
-      
-      if (finalFileUrl) addToUpdate('loiFileName', finalFileUrl);
+      const updatePromises = itemsToProcess.map(async (item) => {
+        const rowUpdate = {};
+        const addToUpdate = (key, value) => {
+            const idx = columnMapping[key];
+            if (idx !== undefined && idx >= 0 && value !== "") {
+                rowUpdate[idx] = value;
+            }
+        };
 
-      // 3. Submit
-      const payload = new URLSearchParams({
-          action: 'update',
-          sheetName: 'Project Main',
-          id: sheetId,
-          rowIndex: selectedItem.rowIndex, // Ensure this is the correct row from fetchData
-          rowData: JSON.stringify(rowUpdate)
+        addToUpdate('installer', formData.installer);
+        addToUpdate('beneficiaryShare', formData.beneficiaryShare);
+        addToUpdate('mrNo', formData.mrNo ? `'${formData.mrNo}` : "");
+        addToUpdate('mrDate', formData.mrDate);
+        addToUpdate('amount', formData.amount);
+        addToUpdate('paidBy', formData.paidBy);
+        addToUpdate('otherRemark', formData.otherRemark);
+        addToUpdate('actual1', formatDateTime(new Date()));
+        
+        if (finalFileUrl) addToUpdate('loiFileName', finalFileUrl);
+
+        const payload = new URLSearchParams({
+            action: 'update',
+            sheetName: 'Project Main',
+            id: sheetId,
+            rowIndex: item.rowIndex,
+            rowData: JSON.stringify(rowUpdate)
+        });
+
+        return fetch(scriptUrl, {
+            method: 'POST',
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: payload.toString()
+        });
       });
 
-      const response = await fetch(scriptUrl, {
-          method: 'POST',
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: payload.toString()
-      });
+      await Promise.all(updatePromises);
 
-      const result = await response.json();
-      if (result.success) {
-          setIsSuccess(true);
-          fetchData();
-      }
+      setIsSuccess(true);
+      fetchData();
+      if (isBulk) setSelectedRows([]); // Clear selection after bulk process
+
     } catch (error) {
       console.error(error);
     } finally {
@@ -424,7 +471,7 @@ setHistoryItems(parsedHistory); // History tab will be empty logic-wise
   };
 
   return (
-    <div className="space-y-8 p-6 md:p-8 max-w-[1600px] mx-auto bg-slate-50/50 min-h-screen">
+    <div className="space-y-8 p-6 md:p-8 max-w-[1600px] mx-auto bg-slate-50/50 min-h-screen animate-fade-in-up">
       <Tabs defaultValue="pending" value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-2 relative p-1 bg-slate-100/80 h-14 rounded-xl border border-slate-200">
           <div className={`absolute top-1 bottom-1 left-1 w-[calc(50%-0.5rem)] rounded-lg bg-white shadow-sm transition-all duration-300 ease-in-out ${activeTab === 'history' ? 'translate-x-full' : 'translate-x-0'}`} />
@@ -447,16 +494,31 @@ setHistoryItems(parsedHistory); // History tab will be empty logic-wise
                   </div>
                   Pending LOI & MR
                 </CardTitle>
-                <Badge variant="outline" className="bg-yellow-100 text-yellow-700 border-yellow-200 px-3 py-1">
-                  {pendingItems.length} Pending
-                </Badge>
+                <div className="flex items-center gap-3">
+                  {selectedRows.length >= 2 && (
+                    <Button 
+                      onClick={handleBulkClick}
+                      className="bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-200 transition-all duration-300 animate-in fade-in slide-in-from-right-4"
+                      size="sm"
+                    >
+                      <Pencil className="h-4 w-4 mr-2" />
+                      Process Selected ({selectedRows.length})
+                    </Button>
+                  )}
+                  <Badge variant="outline" className="bg-yellow-100 text-yellow-700 border-yellow-200 px-3 py-1">
+                    {pendingItems.length} Pending
+                  </Badge>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="hidden md:block overflow-x-auto max-h-[70vh] overflow-y-auto relative [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+              <div className="overflow-x-auto max-h-[70vh] overflow-y-auto relative [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                 <Table className="[&_th]:text-center [&_td]:text-center">
                   <TableHeader className="[&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-blue-50 shadow-sm">
                     <TableRow className="border-b border-blue-100 hover:bg-transparent">
+                      <TableHead className="h-14 px-4 text-xs font-bold text-slate-600 uppercase tracking-wider whitespace-nowrap w-12">
+                        Select
+                      </TableHead>
                       <TableHead className="h-14 px-6 text-xs font-bold text-slate-600 uppercase tracking-wider whitespace-nowrap w-32">Action</TableHead>
 
                       <TableHead className="h-14 px-6 text-xs font-bold text-slate-600 uppercase tracking-wider whitespace-nowrap">Reg ID</TableHead>
@@ -500,12 +562,23 @@ setHistoryItems(parsedHistory); // History tab will be empty logic-wise
                     ) : (
                       pendingItems.map((item) => (
                         <TableRow key={item.serialNo} className="hover:bg-blue-50/50 transition-colors">
+                          <TableCell className="px-4">
+                            <div className="flex justify-center">
+                              <Checkbox 
+                                checked={selectedRows.includes(item.serialNo)}
+                                onCheckedChange={(checked) => handleSelectRow(item.serialNo, checked)}
+                                aria-label={`Select row ${item.serialNo}`}
+                                className="checkbox-3d border-slate-400 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 h-5 w-5 shadow-sm transition-all duration-300 ease-out active:scale-75 hover:scale-110 data-[state=checked]:scale-110"
+                              />
+                            </div>
+                          </TableCell>
                           <TableCell>
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => handleActionClick(item)}
-                              className="bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white border border-blue-200 shadow-xs text-xs font-semibold h-8 px-4 rounded-full flex items-center gap-2 transition-all duration-300 mx-auto"
+                              disabled={selectedRows.length >= 2}
+                              className="bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white border border-blue-200 shadow-xs text-xs font-semibold h-8 px-4 rounded-full flex items-center gap-2 transition-all duration-300 mx-auto disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               <Pencil className="h-3.5 w-3.5" />
                               Process
@@ -656,7 +729,7 @@ setHistoryItems(parsedHistory); // History tab will be empty logic-wise
 
         {/* PROCESSING DIALOG */}
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className={`max-w-4xl max-h-[90vh] overflow-y-auto p-0 gap-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] ${isSuccess ? "bg-transparent shadow-none border-none" : ""}`}>
+          <DialogContent showCloseButton={!isSuccess} className={`max-w-4xl max-h-[90vh] overflow-y-auto p-0 gap-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] ${isSuccess ? "bg-transparent !shadow-none !border-none" : ""}`}>
             {isSuccess ? (
               <div className="flex flex-col items-center justify-center w-full p-8 text-center space-y-6 animate-in fade-in duration-300">
                 <div className="rounded-full bg-white p-5 shadow-2xl shadow-white/20 ring-8 ring-white/10 animate-in zoom-in duration-500 ease-out">
@@ -668,57 +741,64 @@ setHistoryItems(parsedHistory); // History tab will be empty logic-wise
               </div>
             ) : (
               <>
+            {/* Header Content */}
             <DialogHeader className="p-6 pb-2 border-b border-blue-100 bg-blue-50/30">
                 <DialogTitle className="text-xl font-bold bg-linear-to-r from-blue-600 to-blue-600 bg-clip-text text-transparent flex items-center gap-2">
                     <span className="bg-blue-100 p-1.5 rounded-md">
                         <Pencil className="h-4 w-4 text-blue-600" />
                     </span>
-                    Process LOI & MR
+                    {isBulk ? `Batch Process Items` : `Process LOI & MR`}
                 </DialogTitle>
                 <DialogDescription className="text-slate-500 ml-10">
-                     Processing application for <span className="font-semibold text-slate-700">{selectedItem?.beneficiaryName}</span> <span className="font-mono text-xs bg-slate-100 px-1 py-0.5 rounded text-slate-600 border border-slate-200">{selectedItem?.serialNo}</span>
+                     {isBulk ? (
+                        <span>Applying changes to <span className="font-bold text-blue-700">{selectedRows.length} selected items</span>. All fields below will be updated for these items.</span>
+                     ) : (
+                        <span>Processing application for <span className="font-semibold text-slate-700">{selectedItem?.beneficiaryName}</span> <span className="font-mono text-xs bg-slate-100 px-1 py-0.5 rounded text-slate-600 border border-slate-200">{selectedItem?.serialNo}</span></span>
+                     )}
                 </DialogDescription>
             </DialogHeader>
 
-            {selectedItem && (
+            {(selectedItem || isBulk) && (
               <div className="p-6 space-y-6">
-                {/* Beneficiary Info - Read Only */}
-                <div className="rounded-xl border border-blue-100 bg-linear-to-br from-blue-50/50 to-blue-50/30 p-5 shadow-sm">
-                  <h3 className="text-sm font-bold text-blue-900 mb-4 flex items-center gap-2 border-b border-blue-100 pb-2">
-                    <span className="bg-white p-1 rounded shadow-sm">
-                        <CheckCircle2 className="h-4 w-4 text-blue-500" />
-                    </span>
-                    BENEFICIARY DETAILS
-                  </h3>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-y-5 gap-x-6">
-                    <div className="space-y-1">
-                      <span className="text-[10px] uppercase font-bold text-blue-900/60 block mb-1">Reg ID</span>
-                      <div className="font-medium text-slate-700 font-mono bg-white/50 px-2 py-1 rounded border border-blue-100/50 inline-block">{selectedItem.regId}</div>
-                    </div>
-                    <div className="space-y-1">
-                      <span className="text-[10px] uppercase font-bold text-blue-900/60 block mb-1">Father's Name</span>
-                      <p className="font-medium text-slate-700">{selectedItem.fatherName}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <span className="text-[10px] uppercase font-bold text-blue-900/60 block mb-1">Village & Block</span>
-                      <p className="font-medium text-slate-700">{selectedItem.village}, {selectedItem.block}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <span className="text-[10px] uppercase font-bold text-blue-900/60 block mb-1">District</span>
-                      <p className="font-medium text-slate-700">{selectedItem.district}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <span className="text-[10px] uppercase font-bold text-blue-900/60 block mb-1">Category</span>
-                      <p className="font-medium text-slate-700">{selectedItem.category}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <span className="text-[10px] uppercase font-bold text-blue-900/60 block mb-1">Pump Type</span>
-                      <Badge variant="secondary" className="bg-white text-blue-700 border-blue-200 shadow-sm font-medium">
-                        {selectedItem.pumpType}
-                      </Badge>
+                {/* Beneficiary Info - Read Only (Hide in Bulk Mode) */}
+                {!isBulk && selectedItem && (
+                  <div className="rounded-xl border border-blue-100 bg-linear-to-br from-blue-50/50 to-blue-50/30 p-5 shadow-sm">
+                    <h3 className="text-sm font-bold text-blue-900 mb-4 flex items-center gap-2 border-b border-blue-100 pb-2">
+                      <span className="bg-white p-1 rounded shadow-sm">
+                          <CheckCircle2 className="h-4 w-4 text-blue-500" />
+                      </span>
+                      BENEFICIARY DETAILS
+                    </h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-y-5 gap-x-6">
+                      <div className="space-y-1">
+                        <span className="text-[10px] uppercase font-bold text-blue-900/60 block mb-1">Reg ID</span>
+                        <div className="font-medium text-slate-700 font-mono bg-white/50 px-2 py-1 rounded border border-blue-100/50 inline-block">{selectedItem.regId}</div>
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-[10px] uppercase font-bold text-blue-900/60 block mb-1">Father's Name</span>
+                        <p className="font-medium text-slate-700">{selectedItem.fatherName}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-[10px] uppercase font-bold text-blue-900/60 block mb-1">Village & Block</span>
+                        <p className="font-medium text-slate-700">{selectedItem.village}, {selectedItem.block}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-[10px] uppercase font-bold text-blue-900/60 block mb-1">District</span>
+                        <p className="font-medium text-slate-700">{selectedItem.district}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-[10px] uppercase font-bold text-blue-900/60 block mb-1">Category</span>
+                        <p className="font-medium text-slate-700">{selectedItem.category}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-[10px] uppercase font-bold text-blue-900/60 block mb-1">Pump Type</span>
+                        <Badge variant="secondary" className="bg-white text-blue-700 border-blue-200 shadow-sm font-medium">
+                          {selectedItem.pumpType}
+                        </Badge>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
 
                 {/* Form Fields */}
                 <div className="space-y-6">

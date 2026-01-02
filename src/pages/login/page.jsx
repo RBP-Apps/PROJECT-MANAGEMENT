@@ -159,7 +159,7 @@ export default function LoginPage() {
         <div className="absolute bottom-[-10%] left-[20%] w-[50%] h-[50%] bg-purple-400/20 rounded-full blur-[100px] mix-blend-multiply animate-blob-3" />
       </div>
 
-      <Card className="w-full max-w-md border border-white/40 shadow-2xl bg-white/60 backdrop-blur-xl rounded-3xl relative z-10 overflow-hidden">
+      <Card className="w-full max-w-md border border-white/40 shadow-2xl bg-white/60 backdrop-blur-xl rounded-3xl relative z-10 overflow-hidden animate-fade-in-up">
         {/* Top Accent Line */}
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-cyan-500 to-blue-600" />
 

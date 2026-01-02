@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, } from "@/components/ui/dialog";
-import { Search } from "lucide-react";
+import { Search, Users, MapPin, Home } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 export default function PortalPage() {
     const [open, setOpen] = useState(false);
     const [history, setHistory] = useState([]);
@@ -199,7 +200,75 @@ export default function PortalPage() {
             company: "",
         });
     };
-    return (<div className="space-y-6 p-4 md:p-8 max-w-7xl mx-auto">
+    // Calculate quick stats
+    const stats = {
+        total: history.length,
+        districts: new Set(history.map(i => i.district).filter(d => d !== "-")).size,
+        villages: new Set(history.map(i => i.village).filter(v => v !== "-")).size,
+    };
+
+    return (
+    <div className="space-y-6 px-4 pt-2 pb-4 md:px-8 md:pt-4 md:pb-8 max-w-[1600px] mx-auto animate-fade-in-up min-h-screen bg-slate-50/50">
+      
+      {/* Header Section */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+           <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-700 to-cyan-600 bg-clip-text text-transparent">
+             Registration Portal
+           </h1>
+           <p className="text-slate-500 text-sm mt-1">
+             Centralized beneficiary registry and project data.
+           </p>
+        </div>
+        
+        {/* Search Bar */}
+        <div className="relative w-full md:w-72">
+             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+             <Input 
+                placeholder="Search beneficiaries, IDs..." 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9 bg-white border-slate-200 focus-visible:ring-blue-500 transition-all hover:border-blue-300"
+             />
+        </div>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card className="bg-white/80 backdrop-blur border-blue-100 shadow-sm hover:shadow-md transition-all">
+              <CardContent className="p-4 flex items-center justify-between">
+                  <div>
+                      <p className="text-xs font-medium text-slate-500 uppercase">Total Beneficiaries</p>
+                      <h3 className="text-2xl font-bold text-slate-800">{stats.total}</h3>
+                  </div>
+                  <div className="h-10 w-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
+                      <Users className="h-5 w-5" />
+                  </div>
+              </CardContent>
+          </Card>
+          <Card className="bg-white/80 backdrop-blur border-purple-100 shadow-sm hover:shadow-md transition-all">
+              <CardContent className="p-4 flex items-center justify-between">
+                  <div>
+                      <p className="text-xs font-medium text-slate-500 uppercase">Districts Covered</p>
+                      <h3 className="text-2xl font-bold text-slate-800">{stats.districts}</h3>
+                  </div>
+                  <div className="h-10 w-10 rounded-full bg-purple-50 flex items-center justify-center text-purple-600">
+                      <MapPin className="h-5 w-5" />
+                  </div>
+              </CardContent>
+          </Card>
+          <Card className="bg-white/80 backdrop-blur border-emerald-100 shadow-sm hover:shadow-md transition-all">
+              <CardContent className="p-4 flex items-center justify-between">
+                  <div>
+                      <p className="text-xs font-medium text-slate-500 uppercase">Villages Reach</p>
+                      <h3 className="text-2xl font-bold text-slate-800">{stats.villages}</h3>
+                  </div>
+                  <div className="h-10 w-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600">
+                      <Home className="h-5 w-5" />
+                  </div>
+              </CardContent>
+          </Card>
+      </div>
 
       {/* Search and Add Button Removed as per request, Form preserved below */}
       <Dialog open={open} onOpenChange={setOpen}>
@@ -287,44 +356,44 @@ export default function PortalPage() {
           </DialogContent>
         </Dialog>
 
-      <Card className="border border-blue-200 shadow-lg overflow-hidden">
-        <CardContent className="pt-6">
+      <Card className="border border-blue-100 shadow-lg shadow-blue-50/50 overflow-hidden bg-white">
+        <CardContent className="!p-0">
             {/* Desktop Table View */}
-              <div className="hidden md:block border rounded-lg min-h-[60px] overflow-hidden max-h-[70vh] overflow-y-auto relative [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                <Table>
-                  <TableHeader className="[&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-blue-50 shadow-sm">
-                    <TableRow className="border-b border-blue-200 hover:bg-transparent">
-                      <TableHead className="h-10 px-4 py-3 text-xs font-bold text-blue-900 uppercase tracking-wider text-center w-[100px]">
+              <div className="overflow-x-auto min-h-[300px] max-h-[70vh] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                <Table className="w-full text-sm text-left">
+                  <TableHeader className="bg-slate-50 sticky top-0 z-20 shadow-sm">
+                    <TableRow className="border-b border-blue-100 hover:bg-transparent">
+                      <TableHead className="h-12 px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider text-center w-[120px] bg-slate-50/95 backdrop-blur">
                         Serial No
                       </TableHead>
-                      <TableHead className="h-10 px-4 py-3 text-xs font-bold text-blue-900 uppercase tracking-wider text-center">
+                      <TableHead className="h-12 px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider text-center bg-slate-50/95 backdrop-blur">
                         Reg ID
                       </TableHead>
-                      <TableHead className="h-10 px-4 py-3 text-xs font-bold text-blue-900 uppercase tracking-wider text-center min-w-[150px]">
+                      <TableHead className="h-12 px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider text-center min-w-[180px] bg-slate-50/95 backdrop-blur">
                         Beneficiary Name
                       </TableHead>
-                      <TableHead className="h-10 px-4 py-3 text-xs font-bold text-blue-900 uppercase tracking-wider text-center min-w-[150px]">
+                      <TableHead className="h-12 px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider text-center min-w-[150px] bg-slate-50/95 backdrop-blur">
                         Father's Name
                       </TableHead>
-                      <TableHead className="h-10 px-4 py-3 text-xs font-bold text-blue-900 uppercase tracking-wider text-center">
+                      <TableHead className="h-12 px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider text-center bg-slate-50/95 backdrop-blur">
                         Village
                       </TableHead>
-                      <TableHead className="h-10 px-4 py-3 text-xs font-bold text-blue-900 uppercase tracking-wider text-center">
+                      <TableHead className="h-12 px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider text-center bg-slate-50/95 backdrop-blur">
                         Block
                       </TableHead>
-                      <TableHead className="h-10 px-4 py-3 text-xs font-bold text-blue-900 uppercase tracking-wider text-center">
+                      <TableHead className="h-12 px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider text-center bg-slate-50/95 backdrop-blur">
                         District
                       </TableHead>
-                      <TableHead className="h-10 px-4 py-3 text-xs font-bold text-blue-900 uppercase tracking-wider text-center">
+                      <TableHead className="h-12 px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider text-center bg-slate-50/95 backdrop-blur">
                         Category
                       </TableHead>
-                      <TableHead className="h-10 px-4 py-3 text-xs font-bold text-blue-900 uppercase tracking-wider text-center">
+                      <TableHead className="h-12 px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider text-center bg-slate-50/95 backdrop-blur">
                         Pump Source
                       </TableHead>
-                      <TableHead className="h-10 px-4 py-3 text-xs font-bold text-blue-900 uppercase tracking-wider text-center">
+                      <TableHead className="h-12 px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider text-center bg-slate-50/95 backdrop-blur">
                         Pump Type
                       </TableHead>
-                      <TableHead className="h-10 px-4 py-3 text-xs font-bold text-blue-900 uppercase tracking-wider text-center">
+                      <TableHead className="h-12 px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider text-center bg-slate-50/95 backdrop-blur">
                         Company
                       </TableHead>
                     </TableRow>
@@ -357,12 +426,12 @@ export default function PortalPage() {
                       </TableRow>
                     ) : (
                       filteredHistory.map((item) => (
-                        <TableRow key={item.serialNo} className="hover:bg-blue-50/30 transition-colors">
-                          <TableCell className="font-medium text-center text-sm text-slate-600">
+                        <TableRow key={item.serialNo} className="hover:bg-blue-50/50 transition-all duration-200 border-b border-slate-50 last:border-0 hover:shadow-sm">
+                          <TableCell className="font-mono text-center text-xs text-slate-500 bg-slate-50/30">
                             {item.serialNo}
                           </TableCell>
-                          <TableCell className="text-center text-sm">{item.regId}</TableCell>
-                          <TableCell className="text-center font-medium text-slate-800 text-sm">{item.beneficiaryName}</TableCell>
+                          <TableCell className="text-center text-xs font-medium text-slate-700">{item.regId}</TableCell>
+                          <TableCell className="text-center font-semibold text-slate-800 text-sm">{item.beneficiaryName}</TableCell>
                           <TableCell className="text-center text-slate-600 text-sm">{item.fatherName}</TableCell>
                           <TableCell className="text-center text-slate-600 text-sm">{item.village}</TableCell>
                           <TableCell className="text-center text-slate-600 text-sm">{item.block}</TableCell>
@@ -370,125 +439,12 @@ export default function PortalPage() {
                           <TableCell className="text-center text-slate-600 text-sm">{item.category}</TableCell>
                           <TableCell className="text-center text-slate-600 text-sm">{item.pumpSource}</TableCell>
                           <TableCell className="text-center text-slate-600 text-sm">{item.pumpType}</TableCell>
-                          <TableCell className="text-center text-slate-600 text-sm">{item.company}</TableCell>
+                          <TableCell className="text-center text-slate-600 text-sm font-medium">{item.company}</TableCell>
                         </TableRow>
                       ))
                     )}
                   </TableBody>
                 </Table>
-              </div>
-
-              {/* Mobile Card View */}
-              <div className="block md:hidden space-y-4">
-                {isLoading ? (
-                    Array.from({ length: 3 }).map((_, index) => (
-                        <Card key={`skeleton-mobile-${index}`} className="p-4 border-l-4 border-slate-200 shadow-sm animate-pulse">
-                            <div className="space-y-3">
-                                <div className="flex justify-between border-b pb-2">
-                                    <div className="h-4 w-20 bg-slate-200 rounded"></div>
-                                    <div className="h-4 w-10 bg-slate-200 rounded"></div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="h-10 bg-slate-200 rounded"></div>
-                                    <div className="h-10 bg-slate-200 rounded"></div>
-                                    <div className="h-10 bg-slate-200 rounded"></div>
-                                    <div className="h-10 bg-slate-200 rounded"></div>
-                                </div>
-                            </div>
-                        </Card>
-                    ))
-                ) : filteredHistory.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground bg-slate-50/50 rounded-lg border border-dashed border-gray-200">
-                      <p className="mb-4 text-sm">No records found.</p>
-                      <Button variant="outline" size="sm" onClick={() => setOpen(true)} className="border-cyan-200 text-cyan-700 hover:bg-cyan-50">
-                          + Add New
-                      </Button>
-                  </div>
-                ) : (
-                  filteredHistory.map((item) => (<Card key={item.serialNo} className="p-4 border-l-4 border-l-cyan-500 shadow-sm">
-                    <div className="space-y-3 text-sm">
-                      <div className="flex justify-between border-b pb-2">
-                        <span className="font-semibold text-cyan-800">
-                          Serial No:
-                        </span>
-                        <span className="font-mono text-xs">
-                          {item.serialNo}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-1 gap-x-4 gap-y-2">
-                        <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-                          <div>
-                            <span className="text-gray-500 text-xs block">
-                              Reg ID
-                            </span>
-                            <span className="font-medium">{item.regId}</span>
-                          </div>
-                          <div>
-                            <span className="text-gray-500 text-xs block">
-                              Beneficiary Name
-                            </span>
-                            <span className="font-medium">
-                              {item.beneficiaryName}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-gray-500 text-xs block">
-                              Father's Name
-                            </span>
-                            <span className="font-medium">
-                              {item.fatherName}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-gray-500 text-xs block">
-                              Village
-                            </span>
-                            <span className="font-medium">{item.village}</span>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-x-4 gap-y-2 border-t pt-2">
-                          <div>
-                            <span className="text-gray-500 text-xs block">
-                              Block
-                            </span>
-                            <span className="font-medium">{item.block}</span>
-                          </div>
-                          <div>
-                            <span className="text-gray-500 text-xs block">
-                              District
-                            </span>
-                            <span className="font-medium">{item.district}</span>
-                          </div>
-                          <div>
-                            <span className="text-gray-500 text-xs block">
-                              Category
-                            </span>
-                            <span className="font-medium">{item.category}</span>
-                          </div>
-                          <div>
-                            <span className="text-gray-500 text-xs block">
-                              Pump Source
-                            </span>
-                            <span className="font-medium">
-                              {item.pumpSource}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-gray-500 text-xs block">
-                              Pump Type
-                            </span>
-                            <span className="font-medium">{item.pumpType}</span>
-                          </div>
-                          <div>
-                            <span className="text-gray-500 text-xs block">
-                              Company
-                            </span>
-                            <span className="font-medium">{item.company}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </Card>)))}
               </div>
 
         </CardContent>

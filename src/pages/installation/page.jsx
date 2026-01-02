@@ -28,6 +28,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Wrench, Upload, FileCheck, Pencil, Loader2, CheckCircle2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export default function InstallationPage() {
   const [activeTab, setActiveTab] = useState("pending");
@@ -37,6 +38,8 @@ export default function InstallationPage() {
   const [selectedItem, setSelectedItem] = useState(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedRows, setSelectedRows] = useState([]);
+  const [isBulk, setIsBulk] = useState(false);
   const [sheetHeaders, setSheetHeaders] = useState({});
   const [columnMapping, setColumnMapping] = useState({});
   const [isLoaded, setIsLoaded] = useState(false);
@@ -292,6 +295,38 @@ export default function InstallationPage() {
   const handleActionClick = (item) => {
     setSelectedItem(item);
     setIsSuccess(false);
+    setIsBulk(false);
+    setFormData({
+      installationMaterialAgeing: "",
+      installationMaterialReceivingDate: "",
+      installationChallanLink: null,
+      installationStatus: "",
+      installationCompletionDate: "",
+      insPhotoOkDate: "",
+    });
+    setIsDialogOpen(true);
+  };
+
+  const handleSelectAll = (checked) => {
+      if (checked) {
+          setSelectedRows(pendingItems.map((item) => item.serialNo));
+      } else {
+          setSelectedRows([]);
+      }
+  };
+
+  const handleSelectRow = (serialNo, checked) => {
+      if (checked) {
+          setSelectedRows((prev) => [...prev, serialNo]);
+      } else {
+          setSelectedRows((prev) => prev.filter((id) => id !== serialNo));
+      }
+  };
+
+  const handleBulkClick = () => {
+    setIsBulk(true);
+    setSelectedItem(null);
+    setIsSuccess(false);
     setFormData({
       installationMaterialAgeing: "",
       installationMaterialReceivingDate: "",
@@ -325,7 +360,7 @@ export default function InstallationPage() {
   };
 
   const handleSubmit = async () => {
-    if (!selectedItem) return;
+    if (!selectedItem && (!isBulk || selectedRows.length === 0)) return;
     setIsSubmitting(true);
 
     try {
@@ -335,120 +370,103 @@ export default function InstallationPage() {
 
       if (!scriptUrl) throw new Error("Script URL missing");
 
-      // Sparse update object
-      const rowUpdate = {};
-
-      const addToUpdate = (key, value) => {
-        const idx = columnMapping[key];
-        if (idx !== undefined && idx >= 0 && value !== undefined && value !== null && value !== "") {
-          rowUpdate[idx] = value;
-        }
-      };
-
-      // Fields edited in this page
-      addToUpdate("installationMaterialAgeing", formData.installationMaterialAgeing);
-      addToUpdate("installationMaterialReceivingDate", formData.installationMaterialReceivingDate);
-      addToUpdate("installationStatus", formData.installationStatus);
-      addToUpdate("installationCompletionDate", formData.installationCompletionDate);
-      addToUpdate("insPhotoOkDate", formData.insPhotoOkDate);
-
-      // Actual4 timestamp (Installation Done) - VITAL FOR HISTORY TAB
-      const now = new Date();
-      const timestamp =
-        `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
-          now.getDate()
-        ).padStart(2, "0")} ` +
-        `${String(now.getHours()).padStart(2, "0")}:${String(
-          now.getMinutes()
-        ).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
-
-      addToUpdate("actual4", timestamp);
-
+      // 1. UPLOAD FILE ONCE (if any)
       let finalFileUrl = "";
-
-      // Upload Challan File if exists
       if (formData.installationChallanFileObj) {
-        try {
-          const base64 = await getBase64(formData.installationChallanFileObj);
-          
-          const uploadBody = new URLSearchParams({
-            action: "uploadFile",
-            base64Data: base64,
-            fileName: `${selectedItem.beneficiaryName}_${formData.installationChallanFileObj.name}`,
-            mimeType: formData.installationChallanFileObj.type,
-            folderId: driveFolderId || "1pqyJUlUD0zwnojUvNezJgxzim8gjUfmM",
+         try {
+           const base64 = await getBase64(formData.installationChallanFileObj);
+           const uploadBody = new URLSearchParams({
+             action: "uploadFile",
+             base64Data: base64,
+             fileName: `BULK_${formData.installationChallanFileObj.name}`, 
+             mimeType: formData.installationChallanFileObj.type,
+             folderId: driveFolderId || "1pqyJUlUD0zwnojUvNezJgxzim8gjUfmM",
+           });
+
+           const upRes = await fetch(scriptUrl, { method: "POST", body: uploadBody });
+           const upResult = await upRes.json();
+           if (upResult.success && upResult.fileUrl) {
+             finalFileUrl = upResult.fileUrl;
+           } else {
+             console.error("File upload failed", upResult);
+             alert("Warning: File upload failed, but proceeding with data update. " + (upResult.message || ""));
+           }
+         } catch (uploadError) {
+           console.error("Upload error:", uploadError);
+           alert("Warning: File upload error. Proceeding with text data only.");
+         }
+      }
+
+      // 2. IDENTIFY ITEMS
+      let itemsToProcess = [];
+      if (isBulk) {
+          itemsToProcess = pendingItems.filter(item => selectedRows.includes(item.serialNo));
+      } else {
+          itemsToProcess = [selectedItem];
+      }
+
+      // 3. PREPARE REQUESTS
+      const updatePromises = itemsToProcess.map(async (item) => {
+          const rowUpdate = {};
+          const addToUpdate = (key, value) => {
+            const idx = columnMapping[key];
+            if (idx !== undefined && idx >= 0 && value !== undefined && value !== null && value !== "") {
+              rowUpdate[idx] = value;
+            }
+          };
+
+          // Fields
+          addToUpdate("installationMaterialAgeing", formData.installationMaterialAgeing);
+          addToUpdate("installationMaterialReceivingDate", formData.installationMaterialReceivingDate);
+          addToUpdate("installationStatus", formData.installationStatus);
+          addToUpdate("installationCompletionDate", formData.installationCompletionDate);
+          addToUpdate("insPhotoOkDate", formData.insPhotoOkDate);
+
+          // Timestamp
+          const now = new Date();
+          const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")} ` +
+                            `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
+          addToUpdate("actual4", timestamp);
+
+          // File Link
+          if (finalFileUrl) {
+            addToUpdate("installationChallanLink", finalFileUrl);
+          }
+
+          const updatePayload = new URLSearchParams({
+            action: "update",
+            sheetName: "Project Main",
+            id: sheetId,
+            rowIndex: item.rowIndex,
+            rowData: JSON.stringify(rowUpdate),
           });
 
-          const upRes = await fetch(scriptUrl, { method: "POST", body: uploadBody });
-          const upResult = await upRes.json();
-
-          if (upResult.success && upResult.fileUrl) {
-               finalFileUrl = upResult.fileUrl;
-          } else {
-              console.error("File upload failed", upResult);
-              alert("Warning: File upload failed, but proceeding with data update. " + (upResult.message || ""));
-          }
-        } catch (uploadError) {
-          console.error("Upload error:", uploadError);
-          alert("Warning: File upload error. Proceeding with text data only.");
-        }
-      }
-
-      if (finalFileUrl) {
-        addToUpdate("installationChallanLink", finalFileUrl);
-      } else if (formData.installationChallanLink && !formData.installationChallanFileObj) {
-        // If preserving existing link (if any logic allowed editing without re-upload, though currently reset)
-         // console.log("Keeping string link");
-      }
-
-      // Final update call
-      const updatePayload = new URLSearchParams({
-        action: "update",
-        sheetName: "Project Main",
-        id: sheetId,
-        rowIndex: selectedItem.rowIndex,
-        rowData: JSON.stringify(rowUpdate),
+          return fetch(scriptUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: updatePayload.toString(),
+          }).then(res => res.json());
       });
 
-      const response = await fetch(scriptUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: updatePayload.toString(),
-      });
+      // 4. WAIT FOR ALL
+      await Promise.all(updatePromises);
 
-      const textResult = await response.text();
-      let result;
-      try {
-        result = JSON.parse(textResult);
-      } catch (e) {
-        console.error("JSON Parse Error", textResult);
-        // Optimistic success if result is weird but likely worked
-        if (textResult.includes("success") || textResult.trim().length < 50) {
-           result = { status: "success" };
-           await fetchData(); // Optimistic data fetch
-           setIsSuccess(true);
-           return;
-        } else {
-           throw new Error("Invalid server response");
-        }
-      }
+      // 5. SUCCESS
+      setSelectedRows([]);
+      setIsBulk(false);
+      setIsSuccess(true);
+      fetchData();
 
-      if (result.status === "success" || result.success === true) {
-        await fetchData(); // Refresh data to move item to History tab
-        setIsSuccess(true);
-      } else {
-        alert("Update Failed: " + (result.message || result.error));
-      }
     } catch (error) {
       console.error("Submission error:", error);
-      alert("Failed to submit data: " + error.message);
+      alert("Failed to Submit: " + error.message);
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="space-y-8 p-6 md:p-8 max-w-[1600px] mx-auto bg-slate-50/50 min-h-screen">
+    <div className="space-y-8 p-6 md:p-8 max-w-[1600px] mx-auto bg-slate-50/50 min-h-screen animate-fade-in-up">
 
 
       <Tabs
@@ -490,19 +508,34 @@ export default function InstallationPage() {
                   </div>
                   Pending Installation
                 </CardTitle>
-                <Badge
-                  variant="outline"
-                  className="bg-yellow-100 text-yellow-700 border-yellow-200 px-3 py-1"
-                >
-                  {pendingItems.length} Pending
-                </Badge>
+                <div className="flex items-center gap-2">
+                    {selectedRows.length >= 2 && (
+                    <Button
+                      onClick={handleBulkClick}
+                      className="bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-200 transition-all duration-300 animate-in fade-in slide-in-from-right-4"
+                      size="sm"
+                    >
+                      <Pencil className="h-4 w-4 mr-2" />
+                      Installation Selected ({selectedRows.length})
+                    </Button>
+                  )}
+                  <Badge
+                    variant="outline"
+                    className="bg-yellow-100 text-yellow-700 border-yellow-200 px-3 py-1"
+                  >
+                    {pendingItems.length} Pending
+                  </Badge>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="hidden md:block overflow-x-auto">
+              <div className="overflow-x-auto">
                 <Table className="[&_th]:text-center [&_td]:text-center">
                   <TableHeader className="bg-gradient-to-r from-blue-50/50 to-cyan-50/50">
                     <TableRow className="border-b border-blue-100 hover:bg-transparent">
+                        <TableHead className="h-14 px-4 text-xs font-bold text-slate-600 uppercase tracking-wider whitespace-nowrap w-12">
+                            Select
+                        </TableHead>
                       <TableHead className="h-14 px-6 text-xs font-bold text-slate-600 uppercase tracking-wider whitespace-nowrap min-w-[150px]">
                         Action
                       </TableHead>
@@ -621,12 +654,23 @@ export default function InstallationPage() {
                           key={item.serialNo}
                           className="hover:bg-blue-50/30 transition-colors"
                         >
+                          <TableCell className="px-4">
+                            <div className="flex justify-center">
+                              <Checkbox 
+                                checked={selectedRows.includes(item.serialNo)}
+                                onCheckedChange={(checked) => handleSelectRow(item.serialNo, checked)}
+                                aria-label={`Select row ${item.serialNo}`}
+                                className="checkbox-3d border-slate-400 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 h-5 w-5 shadow-sm transition-all duration-300 ease-out active:scale-75 hover:scale-110 data-[state=checked]:scale-110"
+                              />
+                            </div>
+                          </TableCell>
                           <TableCell>
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => handleActionClick(item)}
-                              className="bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white border border-blue-200 shadow-xs text-xs font-semibold h-8 px-4 rounded-full flex items-center gap-2 transition-all duration-300 mx-auto"
+                              disabled={selectedRows.length >= 2}
+                              className="bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white border border-blue-200 shadow-xs text-xs font-semibold h-8 px-4 rounded-full flex items-center gap-2 transition-all duration-300 mx-auto disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               <Wrench className="h-3.5 w-3.5" />
                               Install
@@ -836,7 +880,8 @@ export default function InstallationPage() {
 
                       <Button
                         size="sm"
-                        className="w-full bg-linear-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white shadow-md"
+                        disabled={selectedRows.length >= 2}
+                        className="w-full bg-linear-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                         onClick={() => handleActionClick(item)}
                       >
                         <Wrench className="h-4 w-4 mr-2" />
@@ -1152,8 +1197,16 @@ export default function InstallationPage() {
                               <span className="text-slate-400">-</span>
                             )}
                           </TableCell>
-                          <TableCell className="whitespace-nowrap bg-blue-50/50 text-blue-700 font-bold">
-                            {item.installationStatus}
+                          <TableCell className="whitespace-nowrap bg-blue-50/50 font-bold">
+                            <Badge variant="outline" className={`
+                              ${item.installationStatus === 'Completed' ? 'bg-green-100 text-green-700 border-green-200' : ''}
+                              ${item.installationStatus === 'In Progress' ? 'bg-blue-100 text-blue-700 border-blue-200' : ''}
+                              ${item.installationStatus === 'Pending' ? 'bg-yellow-100 text-yellow-700 border-yellow-200' : ''}
+                              ${item.installationStatus === 'On Hold' ? 'bg-red-100 text-red-700 border-red-200' : ''}
+                              ${!['Completed', 'In Progress', 'Pending', 'On Hold'].includes(item.installationStatus) ? 'bg-slate-100 text-slate-700 border-slate-200' : ''}
+                            `}>
+                              {item.installationStatus}
+                            </Badge>
                           </TableCell>
                           <TableCell className="whitespace-nowrap bg-blue-50/50 text-slate-600">
                             {item.installationCompletionDate}
@@ -1206,9 +1259,17 @@ export default function InstallationPage() {
                           <span className="text-slate-400 text-[10px] uppercase font-semibold">
                             Status
                           </span>
-                          <span className="font-medium text-blue-700">
-                            {item.installationStatus}
-                          </span>
+                          <div className="flex flex-wrap gap-1">
+                             <Badge variant="outline" className={`
+                              ${item.installationStatus === 'Completed' ? 'bg-green-100 text-green-700 border-green-200' : ''}
+                              ${item.installationStatus === 'In Progress' ? 'bg-blue-100 text-blue-700 border-blue-200' : ''}
+                              ${item.installationStatus === 'Pending' ? 'bg-yellow-100 text-yellow-700 border-yellow-200' : ''}
+                              ${item.installationStatus === 'On Hold' ? 'bg-red-100 text-red-700 border-red-200' : ''}
+                              ${!['Completed', 'In Progress', 'Pending', 'On Hold'].includes(item.installationStatus) ? 'bg-slate-100 text-slate-700 border-slate-200' : ''}
+                            `}>
+                              {item.installationStatus}
+                            </Badge>
+                          </div>
                         </div>
                         <div className="flex flex-col gap-1">
                           <span className="text-slate-400 text-[10px] uppercase font-semibold">
@@ -1261,7 +1322,7 @@ export default function InstallationPage() {
 
       {/* INSTALLATION DIALOG */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className={`max-w-4xl max-h-[90vh] overflow-y-auto p-0 gap-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] ${isSuccess ? "bg-transparent shadow-none border-none" : ""}`}>
+        <DialogContent showCloseButton={!isSuccess} className={`max-w-4xl max-h-[90vh] overflow-y-auto p-0 gap-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] ${isSuccess ? "bg-transparent !shadow-none !border-none" : ""}`}>
         {isSuccess ? (
             <div className="flex flex-col items-center justify-center w-full p-8 text-center space-y-6 animate-in fade-in duration-300">
                 <div className="rounded-full bg-white p-5 shadow-2xl shadow-white/20 ring-8 ring-white/10 animate-in zoom-in duration-500 ease-out">
@@ -1281,20 +1342,19 @@ export default function InstallationPage() {
               Process Installation Work
             </DialogTitle>
             <DialogDescription className="text-slate-500 ml-10">
-              Update installation details for{" "}
-              <span className="font-semibold text-slate-700">
-                {selectedItem?.beneficiaryName}
-              </span>{" "}
-              <span className="font-mono text-xs bg-slate-100 px-1 py-0.5 rounded text-slate-600">
-                {selectedItem?.serialNo}
-              </span>
+              {isBulk ? (
+                  <span>Applying changes to <span className="font-bold text-blue-700">{selectedRows.length} selected items</span>. All fields below will be updated for these items.</span>
+              ) : (
+                  <span>Update installation details for <span className="font-semibold text-slate-700">{selectedItem?.beneficiaryName}</span> <span className="font-mono text-xs bg-slate-100 px-1 py-0.5 rounded text-slate-600 border border-slate-200">{selectedItem?.serialNo}</span></span>
+              )}
             </DialogDescription>
           </DialogHeader>
 
           <div className="p-6 space-y-6">
-            {selectedItem && (
+            {(selectedItem || isBulk) && (
               <>
-                {/* PREFILLED BENEFICIARY DETAILS CARD */}
+                {/* PREFILLED BENEFICIARY DETAILS CARD - Hide in Bulk Mode */}
+                {!isBulk && selectedItem && (
                 <div className="bg-slate-50/50 rounded-xl border border-slate-200 p-4">
                   <h3 className="text-sm font-semibold text-slate-800 mb-3 flex items-center gap-2">
                     <FileCheck className="h-4 w-4 text-blue-600" />
@@ -1351,6 +1411,7 @@ export default function InstallationPage() {
                     </div>
                   </div>
                 </div>
+                )}
 
                 {/* INSTALLATION INPUT FORM */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1448,25 +1509,25 @@ export default function InstallationPage() {
                       <SelectContent>
                         <SelectItem
                           value="Completed"
-                          className="text-slate-700 focus:bg-cyan-50 focus:text-cyan-700 cursor-pointer"
+                          className="text-green-600 font-medium focus:bg-green-50 focus:text-green-700 cursor-pointer"
                         >
                           Completed
                         </SelectItem>
                         <SelectItem
                           value="In Progress"
-                          className="text-slate-700 focus:bg-cyan-50 focus:text-cyan-700 cursor-pointer"
+                          className="text-blue-600 font-medium focus:bg-blue-50 focus:text-blue-700 cursor-pointer"
                         >
                           In Progress
                         </SelectItem>
                         <SelectItem
                           value="Pending"
-                          className="text-slate-700 focus:bg-cyan-50 focus:text-cyan-700 cursor-pointer"
+                          className="text-yellow-600 font-medium focus:bg-yellow-50 focus:text-yellow-700 cursor-pointer"
                         >
                           Pending
                         </SelectItem>
                         <SelectItem
                           value="On Hold"
-                          className="text-slate-700 focus:bg-cyan-50 focus:text-cyan-700 cursor-pointer"
+                          className="text-red-600 font-medium focus:bg-red-50 focus:text-red-700 cursor-pointer"
                         >
                           On Hold
                         </SelectItem>
@@ -1509,7 +1570,7 @@ export default function InstallationPage() {
                   </div>
                 </div>
 
-                <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+                <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 pb-6 pr-6">
                   <Button
                     variant="ghost"
                     onClick={() => setIsDialogOpen(false)}

@@ -198,7 +198,7 @@ export default function DashboardPage() {
   }, []);
 
   return (
-    <div className="space-y-6 p-6 md:p-8 animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out min-h-screen bg-slate-50/50">
+    <div className="space-y-6 p-6 md:p-8 animate-fade-in-up min-h-screen bg-slate-50/50">
       
       {/* Header and Actions */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -209,7 +209,7 @@ export default function DashboardPage() {
           <p className="text-slate-500 text-sm mt-1">
             Real-time analytics aggregated from Project Main
           </p>
-        </div>
+        </div> 
         <div className="flex items-center gap-2">
            {lastUpdated && (
                 <span className="text-xs text-slate-400 mr-2 flex items-center gap-1">
@@ -220,7 +220,7 @@ export default function DashboardPage() {
             onClick={fetchData} 
             disabled={isLoading}
             variant="outline"
-            className="border-slate-200 hover:bg-white hover:text-blue-600 transition-colors"
+            className="border-slate-200 hover:bg-white hover:text-blue-600 hover:border-blue-300 hover:shadow-md transition-all duration-300"
           >
             <RefreshCw className={cn("h-4 w-4 mr-2", isLoading && "animate-spin")} />
             Refresh Data
@@ -230,7 +230,7 @@ export default function DashboardPage() {
 
       {/* Summary Cards */}
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="border-l-4 border-l-blue-500 border-y border-r border-blue-50 shadow-sm bg-white/80 backdrop-blur">
+        <Card className="border-l-4 border-l-blue-500 border-y border-r border-blue-50 shadow-sm bg-white/80 backdrop-blur hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-default group">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-medium text-slate-500">Total Beneficiaries</CardTitle>
             <div className="p-2 bg-blue-50 rounded-lg">
@@ -243,7 +243,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-purple-500 border-y border-r border-purple-50 shadow-sm bg-white/80 backdrop-blur">
+        <Card className="border-l-4 border-l-purple-500 border-y border-r border-purple-50 shadow-sm bg-white/80 backdrop-blur hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-default group">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-medium text-slate-500">Active Companies</CardTitle>
             <div className="p-2 bg-purple-50 rounded-lg">
@@ -256,7 +256,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-green-500 border-y border-r border-green-50 shadow-sm bg-white/80 backdrop-blur">
+        <Card className="border-l-4 border-l-green-500 border-y border-r border-green-50 shadow-sm bg-white/80 backdrop-blur hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-default group">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-medium text-slate-500">Sanctioned</CardTitle>
             <div className="p-2 bg-green-50 rounded-lg">
@@ -269,7 +269,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-orange-500 border-y border-r border-orange-50 shadow-sm bg-white/80 backdrop-blur">
+        <Card className="border-l-4 border-l-orange-500 border-y border-r border-orange-50 shadow-sm bg-white/80 backdrop-blur hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-default group">
             <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
                 <CardTitle className="text-sm font-medium text-slate-500">Completion Rate</CardTitle>
                 <div className="p-2 bg-orange-50 rounded-lg">
@@ -350,7 +350,7 @@ export default function DashboardPage() {
                             </TableRow>
                         ) : (
                             data.map((row) => (
-                                <TableRow key={row.id} className="group hover:bg-slate-50/80 transition-colors border-b border-slate-100 last:border-0">
+                                <TableRow key={row.id} className="group hover:bg-blue-50/50 transition-all duration-200 border-b border-slate-100 last:border-0 hover:shadow-sm cursor-default">
                                     <TableCell className="font-medium text-slate-800 border-r border-slate-100">{row.company}</TableCell>
                                     <TableCell className="text-slate-600 border-r border-slate-100">{row.district}</TableCell>
                                     <TableCell className="text-slate-600 border-r border-slate-100">{row.installer}</TableCell>

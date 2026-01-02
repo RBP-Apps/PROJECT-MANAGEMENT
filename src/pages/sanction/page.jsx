@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, } from "@/components/ui/dialog";
-import { FileCheck, Upload, CheckCircle2 } from "lucide-react";
+import { FileCheck, Upload, CheckCircle2, Pencil } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export default function SanctionPage() {
     const [pendingItems, setPendingItems] = useState([]);
@@ -18,6 +19,24 @@ export default function SanctionPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [activeTab, setActiveTab] = useState("pending");
     const [isSuccess, setIsSuccess] = useState(false);
+    const [selectedRows, setSelectedRows] = useState([]);
+    const [isBulk, setIsBulk] = useState(false);
+
+    const handleSelectAll = (checked) => {
+        if (checked) {
+            setSelectedRows(pendingItems.map(item => item.serialNo))
+        } else {
+            setSelectedRows([])
+        }
+    }
+
+    const handleSelectRow = (serialNo, checked) => {
+        if (checked) {
+            setSelectedRows(prev => [...prev, serialNo])
+        } else {
+            setSelectedRows(prev => prev.filter(id => id !== serialNo))
+        }
+    }
     
     // Sheet Metadata
     const [sheetHeaders, setSheetHeaders] = useState({});
@@ -221,6 +240,22 @@ export default function SanctionPage() {
 
     const handleActionClick = (item) => {
         setSelectedItem(item);
+        setIsBulk(false);
+        setIsSuccess(false);
+        setFormData({
+            sanctionNo: "",
+            sanctionDate: "",
+            sanctionFile: null,
+            sanctionFileObj: null,
+            remarks: "",
+        });
+        setIsDialogOpen(true);
+    };
+
+    const handleBulkClick = () => {
+        if (selectedRows.length < 2) return;
+        setSelectedItem(null);
+        setIsBulk(true);
         setIsSuccess(false);
         setFormData({
             sanctionNo: "",
@@ -263,7 +298,7 @@ export default function SanctionPage() {
     };
 
     const handleSubmit = async () => {
-        if (!selectedItem) return;
+        if (!selectedItem && !isBulk) return;
         setIsSubmitting(true);
 
         try {
@@ -272,112 +307,81 @@ export default function SanctionPage() {
 
             if (!scriptUrl) throw new Error("Script URL missing");
 
-            // ✅ STEP 1: Prepare sparse row update (ONLY required columns)
-            const rowUpdate = {};
+            let finalFileUrl = "";
 
-            const addToUpdate = (key, value) => {
-            const idx = columnMapping[key];
-            if (idx !== undefined && idx >= 0 && value !== undefined && value !== null && value !== "") {
-                rowUpdate[idx] = value;
+            // ✅ STEP 1: Upload Sanction File (Once for all if bulk)
+            if (formData.sanctionFileObj) {
+                const base64 = await getBase64(formData.sanctionFileObj);
+
+                const uploadBody = new URLSearchParams({
+                    action: "uploadFile",
+                    base64Data: base64,
+                    fileName: formData.sanctionFileObj.name,
+                    mimeType: formData.sanctionFileObj.type,
+                    folderId: import.meta.env.VITE_DRIVE_DOC_FOLDER_ID,
+                });
+
+                const upRes = await fetch(scriptUrl, {
+                    method: "POST",
+                    body: uploadBody,
+                });
+
+                const upResult = await upRes.json();
+                if (!upResult.success || !upResult.fileUrl) {
+                    throw new Error("Sanction file upload failed");
+                }
+
+                finalFileUrl = upResult.fileUrl;
             }
-            };
 
-            // Sanction fields
-            addToUpdate('sanctionNo', formData.sanctionNo ? `'${formData.sanctionNo}` : "");
-            addToUpdate('sanctionDate', formData.sanctionDate);
+            // ✅ STEP 2: Prepare items to process
+            const itemsToProcess = isBulk 
+                ? pendingItems.filter(item => selectedRows.includes(item.serialNo))
+                : [selectedItem];
 
-            // Actual2 timestamp (Google Sheet safe format)
+            // ✅ Actual2 timestamp (Google Sheet safe format) - Calculate once
             const now = new Date();
             const timestamp =
             `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')} ` +
             `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
 
-            addToUpdate('actual2', timestamp);
+            const updatePromises = itemsToProcess.map(async (item) => {
+                const rowUpdate = {};
 
-             const payload = {
-                action: 'update',
-                sheet: 'Project Main',
-                sheetName: 'Project Main',
-                id: sheetId,
-                rowIndex: selectedItem.rowIndex,
-                rowData: JSON.stringify(rowUpdate),
-            };
+                const addToUpdate = (key, value) => {
+                    const idx = columnMapping[key];
+                    if (idx !== undefined && idx >= 0 && value !== undefined && value !== null && value !== "") {
+                        rowUpdate[idx] = value;
+                    }
+                };
 
-            let finalFileUrl = "";
+                addToUpdate('sanctionNo', formData.sanctionNo ? `'${formData.sanctionNo}` : "");
+                addToUpdate('sanctionDate', formData.sanctionDate);
+                addToUpdate('actual2', timestamp);
 
-            // ✅ STEP 1: Upload Sanction File (same as LOI-MR)
-            if (formData.sanctionFileObj) {
-            const base64 = await getBase64(formData.sanctionFileObj);
-
-            const uploadBody = new URLSearchParams({
-                action: "uploadFile",
-                base64Data: base64,
-                fileName: formData.sanctionFileObj.name,
-                mimeType: formData.sanctionFileObj.type,
-                folderId: import.meta.env.VITE_DRIVE_DOC_FOLDER_ID,
-            });
-
-            const upRes = await fetch(scriptUrl, {
-                method: "POST",
-                body: uploadBody,
-            });
-
-            const upResult = await upRes.json();
-            if (!upResult.success || !upResult.fileUrl) {
-                throw new Error("Sanction file upload failed");
-            }
-
-            finalFileUrl = upResult.fileUrl;
-            }
-
-            // ✅ STEP 2: Sheet update AFTER upload
-            addToUpdate("sanctionNo", formData.sanctionNo ? `'${formData.sanctionNo}` : "");
-            addToUpdate("sanctionDate", formData.sanctionDate);
-
-
-
-            // ✅ Save Drive link into sheet
-            if (finalFileUrl) {
-            addToUpdate("sanctionFile", finalFileUrl);
-            }
-
-            // ✅ STEP 3: Final update call
-            // ✅ STEP 3: Final update call
-            const updatePayload = new URLSearchParams({
-                action: "update",
-                sheetName: "Project Main",
-                id: sheetId,
-                rowIndex: selectedItem.rowIndex,
-                rowData: JSON.stringify(rowUpdate),
-            });
-
-            const response = await fetch(scriptUrl, {
-                method: "POST",
-                headers: { "Content-Type": "application/x-www-form-urlencoded" },
-                body: updatePayload.toString(),
-            });
-
-            const textResult = await response.text();
-            let result;
-            try {
-                result = JSON.parse(textResult);
-            } catch (e) {
-                if (textResult.includes("undefined") || textResult.trim() === "") {
-                    // optimistically assume success
-                    await fetchData();
-                    setIsSuccess(true);
-                    return;
+                if (finalFileUrl) {
+                    addToUpdate("sanctionFile", finalFileUrl);
                 }
-                alert("Server Error: " + textResult);
-                return;
-            }
 
-            if (result.status === 'success' || result.success === true) {
-                await fetchData();
-                setIsSuccess(true);
-            } else {
-                alert("Update Failed: " + (result.message || result.error));
-            }
+                const payload = new URLSearchParams({
+                    action: "update",
+                    sheetName: "Project Main",
+                    id: sheetId,
+                    rowIndex: item.rowIndex,
+                    rowData: JSON.stringify(rowUpdate),
+                });
+
+                return fetch(scriptUrl, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                    body: payload.toString(),
+                });
+            });
+
+            await Promise.all(updatePromises);
+            await fetchData();
+            setIsSuccess(true);
+            if (isBulk) setSelectedRows([]);
 
         } catch (error) {
             console.error("Submission error:", error);
@@ -388,7 +392,7 @@ export default function SanctionPage() {
     };
 
     return (
-        <div className="space-y-8 p-6 md:p-8 max-w-[1600px] mx-auto bg-slate-50/50 min-h-screen">
+        <div className="space-y-8 p-6 md:p-8 max-w-[1600px] mx-auto bg-slate-50/50 min-h-screen animate-fade-in-up">
             <Tabs defaultValue="pending" value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <TabsList className="grid w-full grid-cols-2 relative p-1 bg-slate-100/80 h-14 rounded-xl border border-slate-200">
                     <div className={`absolute top-1 bottom-1 left-1 w-[calc(50%-0.5rem)] rounded-lg bg-white shadow-sm transition-all duration-300 ease-in-out ${activeTab === 'history' ? 'translate-x-full' : 'translate-x-0'}`} />
@@ -411,17 +415,32 @@ export default function SanctionPage() {
                                     </div>
                                     Pending for Sanction
                                 </CardTitle>
-                                <Badge variant="outline" 
-                                    className="bg-yellow-100 text-yellow-700 border-yellow-200 px-3 py-1">
-                                    {pendingItems.length} Pending
-                                </Badge>
+                                <div className="flex items-center gap-3">
+                                    {selectedRows.length >= 2 && (
+                                        <Button 
+                                            onClick={handleBulkClick}
+                                            className="bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-200 transition-all duration-300 animate-in fade-in slide-in-from-right-4"
+                                            size="sm"
+                                        >
+                                            <Pencil className="h-4 w-4 mr-2" />
+                                            Sanction Selected ({selectedRows.length})
+                                        </Button>
+                                    )}
+                                    <Badge variant="outline" 
+                                        className="bg-yellow-100 text-yellow-700 border-yellow-200 px-3 py-1">
+                                        {pendingItems.length} Pending
+                                    </Badge>
+                                </div>
                             </div>
                         </CardHeader>
                         <CardContent className="p-0">
-                            <div className="hidden md:block overflow-x-auto">
+                            <div className="overflow-x-auto">
                                 <Table className="[&_th]:text-center [&_td]:text-center">
                                     <TableHeader className="bg-gradient-to-r from-blue-50/50 to-cyan-50/50">
                                         <TableRow className="border-b border-blue-100 hover:bg-transparent">
+                                            <TableHead className="h-14 px-4 text-xs font-bold text-slate-600 uppercase tracking-wider whitespace-nowrap w-12">
+                                                Select
+                                            </TableHead>
                                             <TableHead className="h-14 px-6 text-xs font-bold text-slate-600 uppercase tracking-wider whitespace-nowrap w-32">Action</TableHead>
 
                                             <TableHead className="h-14 px-6 text-xs font-bold text-slate-600 uppercase tracking-wider whitespace-nowrap">Reg ID</TableHead>
@@ -481,12 +500,23 @@ export default function SanctionPage() {
                                         ) : (
                                             pendingItems.map((item) => (
                                                 <TableRow key={item.serialNo} className="hover:bg-blue-50/50 transition-colors">
+                                                    <TableCell className="px-4">
+                                                        <div className="flex justify-center">
+                                                            <Checkbox 
+                                                                checked={selectedRows.includes(item.serialNo)}
+                                                                onCheckedChange={(checked) => handleSelectRow(item.serialNo, checked)}
+                                                                aria-label={`Select row ${item.serialNo}`}
+                                                                className="checkbox-3d border-slate-400 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 h-5 w-5 shadow-sm transition-all duration-300 ease-out active:scale-75 hover:scale-110 data-[state=checked]:scale-110"
+                                                            />
+                                                        </div>
+                                                    </TableCell>
                                                     <TableCell>
                                                         <Button 
                                                             variant="ghost" 
                                                             size="sm"
                                                             onClick={() => handleActionClick(item)}
-                                                            className="bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white border border-blue-200 shadow-xs text-xs font-semibold h-8 px-4 rounded-full flex items-center gap-2 transition-all duration-300 mx-auto"
+                                                            disabled={selectedRows.length >= 2}
+                                                            className="bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white border border-blue-200 shadow-xs text-xs font-semibold h-8 px-4 rounded-full flex items-center gap-2 transition-all duration-300 mx-auto disabled:opacity-50 disabled:cursor-not-allowed"
                                                         >
                                                             <FileCheck className="h-3.5 w-3.5" />
                                                             Sanction
@@ -559,7 +589,7 @@ export default function SanctionPage() {
                             </div>
                         </CardHeader>
                         <CardContent className="p-0">
-                            <div className="hidden md:block overflow-x-auto">
+                            <div className="overflow-x-auto">
                                 <Table className="[&_th]:text-center [&_td]:text-center">
                                     <TableHeader className="bg-gradient-to-r from-blue-50/50 to-cyan-50/50">
                                         <TableRow className="border-b border-blue-100 hover:bg-transparent">
@@ -685,7 +715,7 @@ export default function SanctionPage() {
 
                 {/* SANCTION DIALOG WITH PREFILLED INFO */}
                 <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                    <DialogContent className={`max-w-4xl max-h-[90vh] overflow-y-auto p-0 gap-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] ${isSuccess ? "bg-transparent shadow-none border-none" : ""}`}>
+                    <DialogContent showCloseButton={!isSuccess} className={`max-w-4xl max-h-[90vh] overflow-y-auto p-0 gap-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] ${isSuccess ? "bg-transparent !shadow-none !border-none" : ""}`}>
                     {isSuccess ? (
                         <div className="flex flex-col items-center justify-center w-full p-8 text-center space-y-6 animate-in fade-in duration-300">
                             <div className="rounded-full bg-white p-5 shadow-2xl shadow-white/20 ring-8 ring-white/10 animate-in zoom-in duration-500 ease-out">
@@ -705,51 +735,57 @@ export default function SanctionPage() {
                                 Process Sanction Order
                             </DialogTitle>
                             <DialogDescription className="text-slate-500 ml-10">
-                                 Processing sanction for <span className="font-semibold text-slate-700">{selectedItem?.beneficiaryName}</span> <span className="font-mono text-xs bg-slate-100 px-1 py-0.5 rounded text-slate-600 border border-slate-200">{selectedItem?.serialNo}</span>
+                                {isBulk ? (
+                                    <span>Applying changes to <span className="font-bold text-blue-700">{selectedRows.length} selected items</span>. All fields below will be updated for these items.</span>
+                                ) : (
+                                    <span>Processing sanction for <span className="font-semibold text-slate-700">{selectedItem?.beneficiaryName}</span> <span className="font-mono text-xs bg-slate-100 px-1 py-0.5 rounded text-slate-600 border border-slate-200">{selectedItem?.serialNo}</span></span>
+                                )}
                             </DialogDescription>
                         </DialogHeader>
 
-                        {selectedItem && (
+                        {(selectedItem || isBulk) && (
                             <div className="p-6 space-y-6">
                                 {/* PREFILLED BENEFICIARY DETAILS CARD */}
-                                <div className="rounded-xl border border-blue-100 bg-linear-to-br from-blue-50/50 to-cyan-50/30 p-5 shadow-sm">
-                                    <h3 className="text-sm font-bold text-blue-900 mb-4 flex items-center gap-2 border-b border-blue-100 pb-2">
-                                        <span className="bg-white p-1 rounded shadow-sm">
-                                            <CheckCircle2 className="h-4 w-4 text-blue-500" />
-                                        </span>
-                                        BENEFICIARY DETAILS
-                                    </h3>
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-y-5 gap-x-6">
-                                        <div className="space-y-1">
-                                            <span className="text-[10px] uppercase font-bold text-blue-900/60 block mb-1">Reg ID</span>
-                                            <div className="font-medium text-slate-700 font-mono bg-white/50 px-2 py-1 rounded border border-blue-100/50 inline-block">
-                                                {selectedItem.regId}
+                                {selectedItem && !isBulk && (
+                                    <div className="rounded-xl border border-blue-100 bg-linear-to-br from-blue-50/50 to-cyan-50/30 p-5 shadow-sm">
+                                        <h3 className="text-sm font-bold text-blue-900 mb-4 flex items-center gap-2 border-b border-blue-100 pb-2">
+                                            <span className="bg-white p-1 rounded shadow-sm">
+                                                <CheckCircle2 className="h-4 w-4 text-blue-500" />
+                                            </span>
+                                            BENEFICIARY DETAILS
+                                        </h3>
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-y-5 gap-x-6">
+                                            <div className="space-y-1">
+                                                <span className="text-[10px] uppercase font-bold text-blue-900/60 block mb-1">Reg ID</span>
+                                                <div className="font-medium text-slate-700 font-mono bg-white/50 px-2 py-1 rounded border border-blue-100/50 inline-block">
+                                                    {selectedItem.regId}
+                                                </div>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <span className="text-[10px] uppercase font-bold text-blue-900/60 block mb-1">Father's Name</span>
+                                                <p className="font-medium text-slate-700">{selectedItem.fatherName}</p>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <span className="text-[10px] uppercase font-bold text-blue-900/60 block mb-1">Village & Block</span>
+                                                <p className="font-medium text-slate-700">{selectedItem.village}, {selectedItem.block}</p>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <span className="text-[10px] uppercase font-bold text-blue-900/60 block mb-1">District</span>
+                                                <p className="font-medium text-slate-700">{selectedItem.district}</p>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <span className="text-[10px] uppercase font-bold text-blue-900/60 block mb-1">Pump Type</span>
+                                                <Badge variant="secondary" className="bg-white text-blue-700 border-blue-200 shadow-sm font-medium">
+                                                    {selectedItem.pumpType}
+                                                </Badge>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <span className="text-[10px] uppercase font-bold text-blue-900/60 block mb-1">Company</span>
+                                                <p className="font-medium text-slate-700 font-mono text-xs">{selectedItem.company}</p>
                                             </div>
                                         </div>
-                                        <div className="space-y-1">
-                                            <span className="text-[10px] uppercase font-bold text-blue-900/60 block mb-1">Father's Name</span>
-                                            <p className="font-medium text-slate-700">{selectedItem.fatherName}</p>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <span className="text-[10px] uppercase font-bold text-blue-900/60 block mb-1">Village & Block</span>
-                                            <p className="font-medium text-slate-700">{selectedItem.village}, {selectedItem.block}</p>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <span className="text-[10px] uppercase font-bold text-blue-900/60 block mb-1">District</span>
-                                            <p className="font-medium text-slate-700">{selectedItem.district}</p>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <span className="text-[10px] uppercase font-bold text-blue-900/60 block mb-1">Pump Type</span>
-                                            <Badge variant="secondary" className="bg-white text-blue-700 border-blue-200 shadow-sm font-medium">
-                                                {selectedItem.pumpType}
-                                            </Badge>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <span className="text-[10px] uppercase font-bold text-blue-900/60 block mb-1">Company</span>
-                                            <p className="font-medium text-slate-700 font-mono text-xs">{selectedItem.company}</p>
-                                        </div>
                                     </div>
-                                </div>
+                                )}
 
                                 {/* SANCTION INPUT FORM */}
                                 <div className="space-y-6">

@@ -28,6 +28,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Info, Pencil, CheckCircle2, FileText, Upload, Settings, Loader2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export default function SystemInfoPage() {
   const [pendingItems, setPendingItems] = useState([]);
@@ -36,6 +37,9 @@ export default function SystemInfoPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [activeTab, setActiveTab] = useState("pending");
+  const [isLoading, setIsLoading] = useState(true);
+  const [selectedRows, setSelectedRows] = useState([]);
+  const [isBulk, setIsBulk] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
 
   // Form state for processing
@@ -60,7 +64,7 @@ export default function SystemInfoPage() {
     photoPrint: "",
   });
 
-  const [isLoading, setIsLoading] = useState(true);
+
 
   // State (no changes to existing state vars needed, just logic)
 
@@ -210,6 +214,7 @@ export default function SystemInfoPage() {
   const handleActionClick = (item) => {
     console.log("Opening Process Dialog for:", item);
     setIsSuccess(false);
+    setIsBulk(false);
     setSelectedItem(item);
     setFormData({
       moduleMake: item.moduleMake || "",
@@ -234,6 +239,49 @@ export default function SystemInfoPage() {
     setIsDialogOpen(true);
   };
 
+  const handleSelectAll = (checked) => {
+      if (checked) {
+          setSelectedRows(pendingItems.map((item) => item.serialNo));
+      } else {
+          setSelectedRows([]);
+      }
+  };
+
+  const handleSelectRow = (serialNo, checked) => {
+      if (checked) {
+          setSelectedRows((prev) => [...prev, serialNo]);
+      } else {
+          setSelectedRows((prev) => prev.filter((id) => id !== serialNo));
+      }
+  };
+
+  const handleBulkClick = () => {
+    setIsBulk(true);
+    setSelectedItem(null);
+    setIsSuccess(false);
+    setFormData({
+      moduleMake: "",
+      moduleSerialNo1: "",
+      moduleSerialNo2: "",
+      moduleSerialNo3: "",
+      moduleSerialNo4: "",
+      moduleSerialNo5: "",
+      moduleSerialNo6: "",
+      moduleSerialNo7: "",
+      moduleSerialNo8: "",
+      moduleSerialNo9: "",
+      controllerMake: "",
+      controllerNo: "",
+      rmsNo: "",
+      pumpMake: "",
+      pumpSerialNo: "",
+      motorSerialNo: "",
+      structureMake: "",
+      photoPrint: "",
+    });
+    setIsDialogOpen(true);
+  };
+
   const handleFileUpload = (e) => {
     if (e.target.files && e.target.files[0]) {
        // setFormData({ ...formData, photoPrint: e.target.files[0].name });
@@ -241,95 +289,100 @@ export default function SystemInfoPage() {
   };
 
   const handleSubmit = async () => {
-    if (!selectedItem) return;
+    if (!selectedItem && (!isBulk || selectedRows.length === 0)) return;
     setIsSubmitting(true);
 
     try {
       const scriptUrl = import.meta.env.VITE_APP_SCRIPT_URL;
       const sheetId = import.meta.env.VITE_SHEET_ID;
 
-      const rowUpdate = {};
-
-      const addToUpdate = (key, value) => {
-        const idx = columnMapping[key];
-        if (idx !== undefined && idx >= 0 && value !== undefined && value !== null) {
-          let finalValue = value;
-          // Force Google Sheets to treat strings with leading zeros as text
-          if (typeof value === "string" && value.startsWith("0") && value.length > 1 && !isNaN(value)) {
-             finalValue = "'" + value;
-          }
-          rowUpdate[idx] = finalValue;
-        }
-      };
-
-      // Add System Info Fields to Update
-      addToUpdate("moduleMake", formData.moduleMake);
-      addToUpdate("moduleSerialNo1", formData.moduleSerialNo1);
-      addToUpdate("moduleSerialNo2", formData.moduleSerialNo2);
-      addToUpdate("moduleSerialNo3", formData.moduleSerialNo3);
-      addToUpdate("moduleSerialNo4", formData.moduleSerialNo4);
-      addToUpdate("moduleSerialNo5", formData.moduleSerialNo5);
-      addToUpdate("moduleSerialNo6", formData.moduleSerialNo6);
-      addToUpdate("moduleSerialNo7", formData.moduleSerialNo7);
-      addToUpdate("moduleSerialNo8", formData.moduleSerialNo8);
-      addToUpdate("moduleSerialNo9", formData.moduleSerialNo9);
-      
-      addToUpdate("controllerMake", formData.controllerMake);
-      addToUpdate("controllerNo", formData.controllerNo);
-      addToUpdate("rmsNo", formData.rmsNo);
-      addToUpdate("pumpMake", formData.pumpMake);
-      addToUpdate("pumpSerialNo", formData.pumpSerialNo);
-      addToUpdate("motorSerialNo", formData.motorSerialNo);
-      addToUpdate("structureMake", formData.structureMake);
-
-      // Generate Actual5 Timestamp
-      const now = new Date();
-      const timestamp =
-        `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
-          now.getDate()
-        ).padStart(2, "0")} ` +
-        `${String(now.getHours()).padStart(2, "0")}:${String(
-          now.getMinutes()
-        ).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
-
-      addToUpdate("actual5", timestamp);
-
-      const updatePayload = new URLSearchParams({
-        action: "update",
-        sheetName: "Project Main",
-        id: sheetId,
-        rowIndex: selectedItem.rowIndex,
-        rowData: JSON.stringify(rowUpdate),
-      });
-
-      const response = await fetch(scriptUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: updatePayload.toString(),
-      });
-
-      const textResult = await response.text();
-      let result;
-      try {
-        result = JSON.parse(textResult);
-      } catch (e) {
-        // Handle weird GAS responses
-        if (textResult.includes("success")) {
-           result = { status: "success" };
-        } else {
-           throw new Error("Invalid Server Response");
-        }
-      }
-
-      if (result.status === "success" || result.success === true) {
-        await fetchData(); 
-        setSelectedItem(null);
-        setIsSubmitting(false); 
-        setIsSuccess(true);
+      // 1. IDENTIFY ITEMS
+      let itemsToProcess = [];
+      if (isBulk) {
+          itemsToProcess = pendingItems.filter(item => selectedRows.includes(item.serialNo));
       } else {
-        alert("Failed to save: " + (result.message || "Unknown error"));
-        setIsSubmitting(false);
+          itemsToProcess = [selectedItem];
       }
+
+      // 2. PREPARE REQUESTS
+      const updatePromises = itemsToProcess.map(async (item) => {
+          const rowUpdate = {};
+          const addToUpdate = (key, value) => {
+            const idx = columnMapping[key];
+            if (idx !== undefined && idx >= 0 && value !== undefined && value !== null) {
+              let finalValue = value;
+              // Force Google Sheets to treat strings with leading zeros as text
+              if (typeof value === "string" && value.startsWith("0") && value.length > 1 && !isNaN(value)) {
+                 finalValue = "'" + value;
+              }
+              rowUpdate[idx] = finalValue;
+            }
+          };
+
+          // Add System Info Fields to Update
+          addToUpdate("moduleMake", formData.moduleMake);
+          addToUpdate("moduleSerialNo1", formData.moduleSerialNo1);
+          addToUpdate("moduleSerialNo2", formData.moduleSerialNo2);
+          addToUpdate("moduleSerialNo3", formData.moduleSerialNo3);
+          addToUpdate("moduleSerialNo4", formData.moduleSerialNo4);
+          addToUpdate("moduleSerialNo5", formData.moduleSerialNo5);
+          addToUpdate("moduleSerialNo6", formData.moduleSerialNo6);
+          addToUpdate("moduleSerialNo7", formData.moduleSerialNo7);
+          addToUpdate("moduleSerialNo8", formData.moduleSerialNo8);
+          addToUpdate("moduleSerialNo9", formData.moduleSerialNo9);
+          
+          addToUpdate("controllerMake", formData.controllerMake);
+          addToUpdate("controllerNo", formData.controllerNo);
+          addToUpdate("rmsNo", formData.rmsNo);
+          addToUpdate("pumpMake", formData.pumpMake);
+          addToUpdate("pumpSerialNo", formData.pumpSerialNo);
+          addToUpdate("motorSerialNo", formData.motorSerialNo);
+          addToUpdate("structureMake", formData.structureMake);
+
+          // Generate Actual5 Timestamp
+          const now = new Date();
+          const timestamp =
+            `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
+              now.getDate()
+            ).padStart(2, "0")} ` +
+            `${String(now.getHours()).padStart(2, "0")}:${String(
+              now.getMinutes()
+            ).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
+
+          addToUpdate("actual5", timestamp);
+
+          const updatePayload = new URLSearchParams({
+            action: "update",
+            sheetName: "Project Main",
+            id: sheetId,
+            rowIndex: item.rowIndex,
+            rowData: JSON.stringify(rowUpdate),
+          });
+
+          const response = await fetch(scriptUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: updatePayload.toString(),
+          });
+
+          return response.json();
+      });
+
+      // 3. WAIT FOR ALL
+      const results = await Promise.all(updatePromises);
+      
+      // Check for failures (rudimentary check, assumes if not failed it's ok)
+      const failed = results.filter(r => r.status === 'error');
+      if (failed.length > 0) {
+          throw new Error(`${failed.length} updates failed. Check console.`);
+      }
+
+      await fetchData(); 
+      setSelectedItem(null);
+      setIsBulk(false);
+      setSelectedRows([]);
+      setIsSubmitting(false); 
+      setIsSuccess(true);
 
     } catch (error) {
       console.error("Submission Error:", error);
@@ -355,7 +408,7 @@ export default function SystemInfoPage() {
   }, [isSuccess]);
 
   return (
-    <div className="space-y-8 p-6 md:p-8 max-w-[1600px] mx-auto bg-slate-50/50 min-h-screen">
+    <div className="space-y-8 p-6 md:p-8 max-w-[1600px] mx-auto bg-slate-50/50 min-h-screen animate-fade-in-up">
       <Tabs
         defaultValue="pending"
         value={activeTab}
@@ -396,19 +449,34 @@ export default function SystemInfoPage() {
                   </div>
                   Pending System Information
                 </CardTitle>
-                <Badge
-                  variant="outline"
-                  className="bg-yellow-100 text-yellow-700 border-yellow-200 px-3 py-1"
-                >
-                  {pendingItems.length} Pending
-                </Badge>
+                <div className="flex items-center gap-2">
+                    {selectedRows.length >= 2 && (
+                    <Button
+                      onClick={handleBulkClick}
+                      className="bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-200 transition-all duration-300 animate-in fade-in slide-in-from-right-4"
+                      size="sm"
+                    >
+                      <Pencil className="h-4 w-4 mr-2" />
+                      System Info Selected ({selectedRows.length})
+                    </Button>
+                  )}
+                  <Badge
+                    variant="outline"
+                    className="bg-yellow-100 text-yellow-700 border-yellow-200 px-3 py-1"
+                  >
+                    {pendingItems.length} Pending
+                  </Badge>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="hidden md:block overflow-x-auto overflow-y-auto max-h-[calc(100vh-220px)] relative">
+              <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-220px)] relative">
                 <Table className="[&_th]:text-center [&_td]:text-center [&_td]:align-middle">
                   <TableHeader className="bg-gradient-to-r from-blue-50/50 to-cyan-50/50 sticky top-0 z-10">
                     <TableRow className="border-b border-blue-100 hover:bg-transparent">
+                      <TableHead className="h-14 px-4 text-xs font-bold text-slate-600 uppercase tracking-wider whitespace-nowrap w-12">
+                          Select
+                      </TableHead>
                       <TableHead className="h-14 px-6 text-xs font-bold text-slate-600 uppercase tracking-wider whitespace-nowrap w-32">
                         Action
                       </TableHead>
@@ -476,10 +544,21 @@ export default function SystemInfoPage() {
                           key={item.serialNo}
                           className="hover:bg-blue-50/30 transition-colors"
                         >
+                          <TableCell className="px-4">
+                            <div className="flex justify-center">
+                              <Checkbox 
+                                checked={selectedRows.includes(item.serialNo)}
+                                onCheckedChange={(checked) => handleSelectRow(item.serialNo, checked)}
+                                aria-label={`Select row ${item.serialNo}`}
+                                className="checkbox-3d border-slate-400 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 h-5 w-5 shadow-sm transition-all duration-300 ease-out active:scale-75 hover:scale-110 data-[state=checked]:scale-110"
+                              />
+                            </div>
+                          </TableCell>
                           <TableCell>
                             <Button
                               size="sm"
-                              className="h-8 px-4 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white border border-blue-200 hover:border-blue-600 transition-all duration-300 shadow-sm text-xs font-semibold flex items-center gap-2 mx-auto"
+                              disabled={selectedRows.length >= 2}
+                              className="h-8 px-4 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white border border-blue-200 hover:border-blue-600 transition-all duration-300 shadow-sm text-xs font-semibold flex items-center gap-2 mx-auto disabled:opacity-50 disabled:cursor-not-allowed"
                               onClick={() => handleActionClick(item)}
                             >
                               <Pencil className="h-3.5 w-3.5" />
@@ -593,7 +672,8 @@ export default function SystemInfoPage() {
 
                         <Button
                           size="sm"
-                          className="w-full bg-linear-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white shadow-md"
+                          disabled={selectedRows.length >= 2}
+                          className="w-full bg-linear-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                           onClick={() => handleActionClick(item)}
                         >
                           <Pencil className="h-4 w-4 mr-2" />
@@ -784,7 +864,7 @@ export default function SystemInfoPage() {
 
       {/* ====================== PROCESSING DIALOG ====================== */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className={`max-w-4xl max-h-[90vh] overflow-y-auto p-0 gap-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] ${isSuccess ? "bg-transparent shadow-none border-none" : "bg-white"}`}>
+        <DialogContent showCloseButton={!isSuccess} className={`max-w-4xl max-h-[90vh] overflow-y-auto p-0 gap-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] ${isSuccess ? "bg-transparent !shadow-none !border-none" : "bg-white"}`}>
         {isSuccess ? (
             <div className="flex flex-col items-center justify-center w-full p-8 text-center space-y-6 animate-in fade-in duration-300">
                 <div className="rounded-full bg-white p-5 shadow-2xl shadow-white/20 ring-8 ring-white/10 animate-in zoom-in duration-500 ease-out">
@@ -804,17 +884,15 @@ export default function SystemInfoPage() {
               Update System Information
             </DialogTitle>
             <DialogDescription className="text-slate-500 ml-10">
-              Update technical details for{" "}
-               <span className="font-semibold text-slate-700">
-                {selectedItem?.beneficiaryName}
-              </span>{" "}
-              <span className="font-mono text-xs bg-slate-100 px-1 py-0.5 rounded text-slate-600 border border-slate-200">
-                {selectedItem?.serialNo}
-              </span>
+              {isBulk ? (
+                  <span>Applying changes to <span className="font-bold text-blue-700">{selectedRows.length} selected items</span>. All fields below will be updated for these items.</span>
+              ) : (
+                  <span>Update technical details for <span className="font-semibold text-slate-700">{selectedItem?.beneficiaryName}</span> <span className="font-mono text-xs bg-slate-100 px-1 py-0.5 rounded text-slate-600 border border-slate-200">{selectedItem?.serialNo}</span></span>
+              )}
             </DialogDescription>
           </DialogHeader>
 
-          {selectedItem && (
+          {(selectedItem || isBulk) && (
             <div className="grid gap-6 p-6">
               
                <div className="space-y-4">
@@ -907,7 +985,7 @@ export default function SystemInfoPage() {
                 </div>
                </div>
 
-              <div className="flex justify-end gap-3 mt-4 pt-6 border-t border-slate-100">
+              <div className="flex justify-end gap-3 mt-4 pt-6 border-t border-slate-100 pb-6 pr-6">
                 <Button
                   variant="outline"
                   onClick={() => setIsDialogOpen(false)}
