@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Users, UserPlus, Check, ChevronsUpDown, Loader2, ShieldAlert, KeyRound } from "lucide-react";
+import { Users, UserPlus, Check, ChevronsUpDown, Loader2, ShieldAlert, KeyRound, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function SettingPage() {
@@ -50,6 +50,14 @@ export default function SettingPage() {
     role: "User",
     pageAccess: [],
   });
+
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const filteredUsers = users.filter((user) =>
+    Object.values(user).some((value) =>
+      String(value).toLowerCase().includes(searchTerm.toLowerCase())
+    )
+  );
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -290,11 +298,20 @@ export default function SettingPage() {
       </div>
 
       <Card className="border border-blue-100 shadow-xl shadow-blue-100/20 bg-white/80 backdrop-blur-sm overflow-hidden">
-        <CardHeader className="border-b border-blue-50 bg-blue-50/30 px-6 py-1">
+        <CardHeader className="border-b border-blue-50 bg-blue-50/30 px-6 py-1 flex flex-col md:flex-row items-center justify-between gap-4 h-auto min-h-[3.5rem]">
             <CardTitle className="text-lg font-semibold text-blue-900 flex items-center gap-2">
                 <Users className="h-5 w-5 text-blue-600" />
                 Registered Users
             </CardTitle>
+            <div className="relative w-full md:w-100">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Input 
+                    placeholder="Search users..." 
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-9 bg-white border-black focus-visible:ring-blue-200 h-9 transition-all hover:border-blue-200"
+                />
+            </div>
         </CardHeader>
         <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -317,14 +334,14 @@ export default function SettingPage() {
                                     ))}
                                 </TableRow>
                             ))
-                        ) : users.length === 0 ? (
+                        ) : filteredUsers.length === 0 ? (
                              <TableRow>
                                 <TableCell colSpan={5} className="h-32 text-center text-slate-500">
-                                    No users found.
+                                    {users.length === 0 ? "No users found." : "No users found matching your search."}
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            users.map((user, index) => (
+                            filteredUsers.map((user, index) => (
                                 <TableRow key={index} className="hover:bg-blue-50/30 transition-colors">
                                     <TableCell className="font-medium text-slate-800">{user.userName}</TableCell>
                                     <TableCell className="font-mono text-xs text-slate-500">{user.userId}</TableCell>

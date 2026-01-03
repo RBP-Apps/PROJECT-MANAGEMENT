@@ -20,7 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { CheckCircle2, ClipboardCheck, Upload, FileCheck, Loader2 } from "lucide-react";
+import { CheckCircle2, ClipboardCheck, Upload, FileCheck, Loader2, Search } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 
 export default function JccCompletionPage() {
@@ -35,6 +35,20 @@ export default function JccCompletionPage() {
   const [columnMapping, setColumnMapping] = useState({});
   const [selectedRows, setSelectedRows] = useState([]);
   const [isBulk, setIsBulk] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const filteredPendingItems = pendingItems.filter((item) =>
+    Object.values(item).some((value) =>
+      String(value).toLowerCase().includes(searchTerm.toLowerCase())
+    )
+  );
+
+  const filteredHistoryItems = historyItems.filter((item) =>
+    Object.values(item).some((value) =>
+      String(value).toLowerCase().includes(searchTerm.toLowerCase())
+    )
+  );
+
   const [formData, setFormData] = useState({
     jccReceivingDate: "",
     jccAgeing: "",
@@ -242,7 +256,7 @@ export default function JccCompletionPage() {
 
   const handleSelectAll = (checked) => {
       if (checked) {
-          setSelectedRows(pendingItems.map((item) => item.serialNo));
+          setSelectedRows(filteredPendingItems.map((item) => item.serialNo));
       } else {
           setSelectedRows([]);
       }
@@ -439,19 +453,32 @@ export default function JccCompletionPage() {
           className="mt-6 focus-visible:ring-0 focus-visible:outline-none animate-in fade-in-0 slide-in-from-left-4 duration-500 ease-out"
         >
           <Card className="border border-blue-100 shadow-xl shadow-blue-100/20 bg-white/80 backdrop-blur-sm overflow-hidden">
-            <CardHeader className="border-b border-blue-50 bg-blue-50/30 px-6 py-0.5 h-10 flex items-center">
-              <div className="flex items-center justify-between w-full">
+            <CardHeader className="border-b border-blue-50 bg-blue-50/30 px-6 py-3 flex flex-col md:flex-row items-center gap-4 md:gap-0 justify-between h-auto min-h-[3.5rem]">
+              <div className="flex items-center gap-2 w-full md:w-auto justify-between">
                 <CardTitle className="text-lg font-semibold text-blue-900 flex items-center gap-2">
                   <div className="p-1 bg-blue-100 rounded-lg">
                     <ClipboardCheck className="h-4 w-4 text-blue-600" />
                   </div>
                   Pending JCC
                 </CardTitle>
-                <div className="flex items-center gap-2">
+              </div>
+
+              <div className="flex flex-col md:flex-row items-center gap-3 w-full md:w-auto">
+                 <div className="relative w-full md:w-100">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <Input 
+                        placeholder="Search..." 
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-9 bg-white border-black focus-visible:ring-blue-200 h-9 transition-all hover:border-blue-200"
+                    />
+                 </div>
+                 
+                 <div className="flex items-center gap-2 w-full md:w-auto justify-end">
                     {selectedRows.length >= 2 && (
                     <Button
                       onClick={handleBulkClick}
-                      className="bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-200 transition-all duration-300 animate-in fade-in slide-in-from-right-4"
+                      className="bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-200 transition-all duration-300 animate-in fade-in slide-in-from-right-4 h-9"
                       size="sm"
                     >
                       <ClipboardCheck className="h-4 w-4 mr-2" />
@@ -460,9 +487,9 @@ export default function JccCompletionPage() {
                   )}
                   <Badge
                     variant="outline"
-                    className="bg-yellow-100 text-yellow-700 border-yellow-200 px-3 py-1"
+                    className="bg-yellow-100 text-yellow-700 border-yellow-200 px-3 py-1 h-9 flex items-center"
                   >
-                    {pendingItems.length} Pending
+                    {filteredPendingItems.length} Pending
                   </Badge>
                 </div>
               </div>
@@ -519,7 +546,7 @@ export default function JccCompletionPage() {
                            ))}
                         </TableRow>
                       ))
-                    ) : pendingItems.length === 0 ? (
+                    ) : filteredPendingItems.length === 0 ? (
                       <TableRow>
                         <TableCell
                           colSpan={10}
@@ -529,12 +556,12 @@ export default function JccCompletionPage() {
                             <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center">
                               <ClipboardCheck className="h-6 w-6 text-slate-400" />
                             </div>
-                            <p>No pending JCC records found</p>
+                            <p>No pending JCC records found matching your search</p>
                           </div>
                         </TableCell>
                       </TableRow>
                     ) : (
-                      pendingItems.map((item) => (
+                      filteredPendingItems.map((item) => (
                         <TableRow
                           key={item.serialNo}
                           className="hover:bg-blue-50/30 transition-colors"
@@ -606,7 +633,7 @@ export default function JccCompletionPage() {
                 {isLoading ? (
                    <div className="text-center p-4 text-slate-500">Loading...</div>
                 ) : (
-                pendingItems.map((item) => (
+                filteredPendingItems.map((item) => (
                   <Card
                     key={item.serialNo}
                     className="bg-white border text-sm shadow-sm"
@@ -701,19 +728,31 @@ export default function JccCompletionPage() {
           className="mt-6 focus-visible:ring-0 focus-visible:outline-none animate-in fade-in-0 slide-in-from-right-4 duration-500 ease-out"
         >
           <Card className="border border-blue-100 shadow-xl shadow-blue-100/20 bg-white/80 backdrop-blur-sm overflow-hidden">
-            <CardHeader className="border-b border-blue-50 bg-blue-50/30 px-6 py-0.5 h-10 flex items-center">
-              <div className="flex items-center justify-between w-full">
+            <CardHeader className="border-b border-blue-50 bg-blue-50/30 px-6 py-3 flex flex-col md:flex-row items-center gap-4 md:gap-0 justify-between h-auto min-h-[3.5rem]">
+              <div className="flex items-center gap-2 w-full md:w-auto">
                 <CardTitle className="text-lg font-semibold text-blue-900 flex items-center gap-2">
                   <div className="p-1 bg-blue-100 rounded-lg">
                     <FileCheck className="h-4 w-4 text-blue-600" />
                   </div>
                   JCC History
                 </CardTitle>
-                <Badge
+              </div>
+
+              <div className="flex flex-col md:flex-row items-center gap-3 w-full md:w-auto">
+                 <div className="relative w-full md:w-100">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <Input 
+                        placeholder="Search..." 
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-9 bg-white border-black focus-visible:ring-blue-200 h-9 transition-all hover:border-blue-200"
+                    />
+                 </div>
+                 <Badge
                   variant="outline"
-                  className="bg-blue-100 text-blue-700 border-blue-200 px-3 py-1"
+                  className="bg-blue-100 text-blue-700 border-blue-200 px-3 py-1 h-9 flex items-center whitespace-nowrap"
                 >
-                  {historyItems.length} Records
+                  {filteredHistoryItems.length} Records
                 </Badge>
               </div>
             </CardHeader>
@@ -765,7 +804,7 @@ export default function JccCompletionPage() {
                            ))}
                         </TableRow>
                       ))
-                    ) : historyItems.length === 0 ? (
+                    ) : filteredHistoryItems.length === 0 ? (
                       <TableRow>
                         <TableCell
                           colSpan={10}
@@ -775,12 +814,12 @@ export default function JccCompletionPage() {
                             <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center">
                               <FileCheck className="h-6 w-6 text-slate-400" />
                             </div>
-                            <p>No JCC records yet.</p>
+                            <p>{historyItems.length === 0 ? "No JCC records yet." : "No history records found matching your search."}</p>
                           </div>
                         </TableCell>
                       </TableRow>
                     ) : (
-                      historyItems.map((item) => (
+                      filteredHistoryItems.map((item) => (
                         <TableRow
                           key={item.serialNo}
                           className="hover:bg-blue-50/30 transition-colors"
@@ -839,7 +878,7 @@ export default function JccCompletionPage() {
 
               {/* Mobile Card View */}
               <div className="block md:hidden space-y-4 p-4 bg-slate-50">
-                {historyItems.map((item) => (
+                {filteredHistoryItems.map((item) => (
                   <Card
                     key={item.serialNo}
                     className="bg-white border text-sm shadow-sm"
