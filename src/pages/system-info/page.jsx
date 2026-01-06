@@ -27,7 +27,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Info, Pencil, CheckCircle2, FileText, Upload, Settings, Loader2, Search } from "lucide-react";
+import {
+  Info,
+  Pencil,
+  CheckCircle2,
+  FileText,
+  Upload,
+  Settings,
+  Loader2,
+  Search,
+} from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 
 export default function SystemInfoPage() {
@@ -43,19 +52,75 @@ export default function SystemInfoPage() {
   const [isLoaded, setIsLoaded] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
-  const filteredPendingItems = pendingItems.filter((item) =>
-    Object.values(item).some((value) =>
-      String(value).toLowerCase().includes(searchTerm.toLowerCase())
-    )
-  );
+  const [filters, setFilters] = useState({
+    regId: "",
+    village: "",
+    block: "",
+    district: "",
+    pumpType: "",
+    company: "",
+  });
 
-  const filteredHistoryItems = historyItems.filter((item) =>
-    Object.values(item).some((value) =>
-      String(value).toLowerCase().includes(searchTerm.toLowerCase())
-    )
-  );
+  const getUniquePendingValues = (field) => {
+    const values = pendingItems
+      .map((item) => item[field])
+      .filter((v) => v && v !== "-");
+    return [...new Set(values)].sort();
+  };
+
+  const getUniqueHistoryValues = (field) => {
+    const values = historyItems
+      .map((item) => item[field])
+      .filter((v) => v && v !== "-");
+    return [...new Set(values)].sort();
+  };
+
+  // const filteredPendingItems = pendingItems.filter((item) =>
+  //   Object.values(item).some((value) =>
+  //     String(value).toLowerCase().includes(searchTerm.toLowerCase())
+  //   )
+  // );
+
+  // const filteredHistoryItems = historyItems.filter((item) =>
+  //   Object.values(item).some((value) =>
+  //     String(value).toLowerCase().includes(searchTerm.toLowerCase())
+  //   )
+  // );
 
   // Form state for processing
+
+  const filteredPendingItems = pendingItems.filter((item) => {
+    const matchesSearch = Object.values(item).some((value) =>
+      String(value).toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    const matchesFilters =
+      (!filters.regId || item.regId === filters.regId) &&
+      (!filters.village || item.village === filters.village) &&
+      (!filters.block || item.block === filters.block) &&
+      (!filters.district || item.district === filters.district) &&
+      (!filters.pumpType || item.pumpType === filters.pumpType) &&
+      (!filters.company || item.company === filters.company);
+
+    return matchesSearch && matchesFilters;
+  });
+
+  const filteredHistoryItems = historyItems.filter((item) => {
+    const matchesSearch = Object.values(item).some((value) =>
+      String(value).toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    const matchesFilters =
+      (!filters.regId || item.regId === filters.regId) &&
+      (!filters.village || item.village === filters.village) &&
+      (!filters.block || item.block === filters.block) &&
+      (!filters.district || item.district === filters.district) &&
+      (!filters.pumpType || item.pumpType === filters.pumpType) &&
+      (!filters.company || item.company === filters.company);
+
+    return matchesSearch && matchesFilters;
+  });
+
   const [formData, setFormData] = useState({
     moduleMake: "",
     moduleSerialNo1: "",
@@ -76,8 +141,6 @@ export default function SystemInfoPage() {
     structureMake: "",
     photoPrint: "",
   });
-
-
 
   // State (no changes to existing state vars needed, just logic)
 
@@ -112,7 +175,7 @@ export default function SystemInfoPage() {
         return;
       }
 
-      const headerRowIndex = 5; 
+      const headerRowIndex = 5;
       if (!rawRows[headerRowIndex]) {
         console.error("Header row missing");
         setIsLoading(false);
@@ -120,11 +183,13 @@ export default function SystemInfoPage() {
         return;
       }
 
-      const rawHeaders = rawRows[headerRowIndex].map(h => String(h).trim());
-      const headers = rawHeaders.map(h => h.toLowerCase());
+      const rawHeaders = rawRows[headerRowIndex].map((h) => String(h).trim());
+      const headers = rawHeaders.map((h) => h.toLowerCase());
 
       const findCol = (keys) =>
-        headers.findIndex(h => keys.every(k => h.replace(/\s+/g, "").includes(k)));
+        headers.findIndex((h) =>
+          keys.every((k) => h.replace(/\s+/g, "").includes(k))
+        );
 
       const colMap = {
         serialNo: findCol(["serial"]),
@@ -137,7 +202,7 @@ export default function SystemInfoPage() {
         pumpType: findCol(["pump", "type"]),
         company: findCol(["company"]),
         moduleMake: findCol(["module", "make"]),
-        moduleSerialNo1: findCol(["module", "sno1"]), 
+        moduleSerialNo1: findCol(["module", "sno1"]),
         moduleSerialNo2: findCol(["module", "sno2"]),
         moduleSerialNo3: findCol(["module", "sno3"]),
         moduleSerialNo4: findCol(["module", "sno4"]),
@@ -152,22 +217,22 @@ export default function SystemInfoPage() {
         pumpMake: findCol(["pump", "make"]),
         pumpSerialNo: findCol(["pump", "serial"]),
         motorSerialNo: findCol(["motor", "serial"]),
-        structureMake: findCol(["strucutre", "make"]), 
-        
+        structureMake: findCol(["strucutre", "make"]),
+
         // Robust finders
         actual4: (() => {
-           const i = findCol(["actual", "4"]);
-           if (i !== -1) return i;
-           return findCol(["installation", "done"]); 
+          const i = findCol(["actual", "4"]);
+          if (i !== -1) return i;
+          return findCol(["installation", "done"]);
         })(),
         planned5: findCol(["planned", "5"]), // System Info Planned
         actual5: (() => {
-           const i = findCol(["actual", "5"]);
-           if (i !== -1) return i;
-           return findCol(["system", "info"]); 
+          const i = findCol(["actual", "5"]);
+          if (i !== -1) return i;
+          return findCol(["system", "info"]);
         })(),
       };
-      
+
       console.log("Col Map:", colMap);
       setColumnMapping(colMap);
 
@@ -179,7 +244,8 @@ export default function SystemInfoPage() {
         if (!row || !row[colMap.regId]) continue;
 
         // Safely access fields
-        const getVal = (idx) => (idx !== -1 && row[idx] !== undefined) ? row[idx] : "";
+        const getVal = (idx) =>
+          idx !== -1 && row[idx] !== undefined ? row[idx] : "";
 
         const item = {
           serialNo: getVal(colMap.serialNo),
@@ -196,26 +262,26 @@ export default function SystemInfoPage() {
           controllerMake: getVal(colMap.controllerMake),
           pumpMake: getVal(colMap.pumpMake),
           structureMake: getVal(colMap.structureMake),
-          
+
           actual4: getVal(colMap.actual4),
           planned5: getVal(colMap.planned5),
           actual5: getVal(colMap.actual5),
           rowIndex: i + 1,
-        }
+        };
 
         const isPlanned5 = item.planned5 && String(item.planned5).trim() !== "";
-        const isSystemInfoDone = item.actual5 && String(item.actual5).trim() !== ""; 
+        const isSystemInfoDone =
+          item.actual5 && String(item.actual5).trim() !== "";
 
         if (isSystemInfoDone) {
-            history.push(item);
+          history.push(item);
         } else if (isPlanned5) {
-            pending.push(item);
+          pending.push(item);
         }
       }
 
       setPendingItems(pending);
       setHistoryItems(history);
-
     } catch (e) {
       console.error("Fetch Data Error:", e);
     } finally {
@@ -253,19 +319,19 @@ export default function SystemInfoPage() {
   };
 
   const handleSelectAll = (checked) => {
-      if (checked) {
-          setSelectedRows(filteredPendingItems.map((item) => item.serialNo));
-      } else {
-          setSelectedRows([]);
-      }
+    if (checked) {
+      setSelectedRows(filteredPendingItems.map((item) => item.serialNo));
+    } else {
+      setSelectedRows([]);
+    }
   };
 
   const handleSelectRow = (serialNo, checked) => {
-      if (checked) {
-          setSelectedRows((prev) => [...prev, serialNo]);
-      } else {
-          setSelectedRows((prev) => prev.filter((id) => id !== serialNo));
-      }
+    if (checked) {
+      setSelectedRows((prev) => [...prev, serialNo]);
+    } else {
+      setSelectedRows((prev) => prev.filter((id) => id !== serialNo));
+    }
   };
 
   const handleBulkClick = () => {
@@ -297,7 +363,7 @@ export default function SystemInfoPage() {
 
   const handleFileUpload = (e) => {
     if (e.target.files && e.target.files[0]) {
-       // setFormData({ ...formData, photoPrint: e.target.files[0].name });
+      // setFormData({ ...formData, photoPrint: e.target.files[0].name });
     }
   };
 
@@ -312,101 +378,113 @@ export default function SystemInfoPage() {
       // 1. IDENTIFY ITEMS
       let itemsToProcess = [];
       if (isBulk) {
-          itemsToProcess = pendingItems.filter(item => selectedRows.includes(item.serialNo));
+        itemsToProcess = pendingItems.filter((item) =>
+          selectedRows.includes(item.serialNo)
+        );
       } else {
-          itemsToProcess = [selectedItem];
+        itemsToProcess = [selectedItem];
       }
 
       // 2. PREPARE REQUESTS
       const updatePromises = itemsToProcess.map(async (item) => {
-          const rowUpdate = {};
-          const addToUpdate = (key, value) => {
-            const idx = columnMapping[key];
-            if (idx !== undefined && idx >= 0 && value !== undefined && value !== null) {
-              let finalValue = value;
-              // Force Google Sheets to treat strings with leading zeros as text
-              if (typeof value === "string" && value.startsWith("0") && value.length > 1 && !isNaN(value)) {
-                 finalValue = "'" + value;
-              }
-              rowUpdate[idx] = finalValue;
+        const rowUpdate = {};
+        const addToUpdate = (key, value) => {
+          const idx = columnMapping[key];
+          if (
+            idx !== undefined &&
+            idx >= 0 &&
+            value !== undefined &&
+            value !== null
+          ) {
+            let finalValue = value;
+            // Force Google Sheets to treat strings with leading zeros as text
+            if (
+              typeof value === "string" &&
+              value.startsWith("0") &&
+              value.length > 1 &&
+              !isNaN(value)
+            ) {
+              finalValue = "'" + value;
             }
-          };
+            rowUpdate[idx] = finalValue;
+          }
+        };
 
-          // Add System Info Fields to Update
-          addToUpdate("moduleMake", formData.moduleMake);
-          addToUpdate("moduleSerialNo1", formData.moduleSerialNo1);
-          addToUpdate("moduleSerialNo2", formData.moduleSerialNo2);
-          addToUpdate("moduleSerialNo3", formData.moduleSerialNo3);
-          addToUpdate("moduleSerialNo4", formData.moduleSerialNo4);
-          addToUpdate("moduleSerialNo5", formData.moduleSerialNo5);
-          addToUpdate("moduleSerialNo6", formData.moduleSerialNo6);
-          addToUpdate("moduleSerialNo7", formData.moduleSerialNo7);
-          addToUpdate("moduleSerialNo8", formData.moduleSerialNo8);
-          addToUpdate("moduleSerialNo9", formData.moduleSerialNo9);
-          
-          addToUpdate("controllerMake", formData.controllerMake);
-          addToUpdate("controllerNo", formData.controllerNo);
-          addToUpdate("rmsNo", formData.rmsNo);
-          addToUpdate("pumpMake", formData.pumpMake);
-          addToUpdate("pumpSerialNo", formData.pumpSerialNo);
-          addToUpdate("motorSerialNo", formData.motorSerialNo);
-          addToUpdate("structureMake", formData.structureMake);
+        // Add System Info Fields to Update
+        addToUpdate("moduleMake", formData.moduleMake);
+        addToUpdate("moduleSerialNo1", formData.moduleSerialNo1);
+        addToUpdate("moduleSerialNo2", formData.moduleSerialNo2);
+        addToUpdate("moduleSerialNo3", formData.moduleSerialNo3);
+        addToUpdate("moduleSerialNo4", formData.moduleSerialNo4);
+        addToUpdate("moduleSerialNo5", formData.moduleSerialNo5);
+        addToUpdate("moduleSerialNo6", formData.moduleSerialNo6);
+        addToUpdate("moduleSerialNo7", formData.moduleSerialNo7);
+        addToUpdate("moduleSerialNo8", formData.moduleSerialNo8);
+        addToUpdate("moduleSerialNo9", formData.moduleSerialNo9);
 
-          // Generate Actual5 Timestamp
-          const now = new Date();
-          const timestamp =
-            `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
-              now.getDate()
-            ).padStart(2, "0")} ` +
-            `${String(now.getHours()).padStart(2, "0")}:${String(
-              now.getMinutes()
-            ).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
+        addToUpdate("controllerMake", formData.controllerMake);
+        addToUpdate("controllerNo", formData.controllerNo);
+        addToUpdate("rmsNo", formData.rmsNo);
+        addToUpdate("pumpMake", formData.pumpMake);
+        addToUpdate("pumpSerialNo", formData.pumpSerialNo);
+        addToUpdate("motorSerialNo", formData.motorSerialNo);
+        addToUpdate("structureMake", formData.structureMake);
 
-          addToUpdate("actual5", timestamp);
+        // Generate Actual5 Timestamp
+        const now = new Date();
+        const timestamp =
+          `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(
+            2,
+            "0"
+          )}-${String(now.getDate()).padStart(2, "0")} ` +
+          `${String(now.getHours()).padStart(2, "0")}:${String(
+            now.getMinutes()
+          ).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
 
-          const updatePayload = new URLSearchParams({
-            action: "update",
-            sheetName: "Project Main",
-            id: sheetId,
-            rowIndex: item.rowIndex,
-            rowData: JSON.stringify(rowUpdate),
-          });
+        addToUpdate("actual5", timestamp);
 
-          const response = await fetch(scriptUrl, {
-            method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: updatePayload.toString(),
-          });
+        const updatePayload = new URLSearchParams({
+          action: "update",
+          sheetName: "Project Main",
+          id: sheetId,
+          rowIndex: item.rowIndex,
+          rowData: JSON.stringify(rowUpdate),
+        });
 
-          return response.json();
+        const response = await fetch(scriptUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: updatePayload.toString(),
+        });
+
+        return response.json();
       });
 
       // 3. WAIT FOR ALL
       const results = await Promise.all(updatePromises);
-      
+
       // Check for failures (rudimentary check, assumes if not failed it's ok)
-      const failed = results.filter(r => r.status === 'error');
+      const failed = results.filter((r) => r.status === "error");
       if (failed.length > 0) {
-          throw new Error(`${failed.length} updates failed. Check console.`);
+        throw new Error(`${failed.length} updates failed. Check console.`);
       }
 
-      await fetchData(); 
+      await fetchData();
       setSelectedItem(null);
       setIsBulk(false);
       setSelectedRows([]);
-      setIsSubmitting(false); 
+      setIsSubmitting(false);
       setIsSuccess(true);
-
     } catch (error) {
       console.error("Submission Error:", error);
       alert("Error submitting data. Please try again.");
       setIsSubmitting(false);
-    } 
+    }
   };
 
   useEffect(() => {
     fetchData();
-    const timer = setTimeout(() => setIsLoading(false), 15000); 
+    const timer = setTimeout(() => setIsLoading(false), 15000);
     return () => clearTimeout(timer);
   }, []);
 
@@ -465,18 +543,18 @@ export default function SystemInfoPage() {
               </div>
 
               <div className="flex flex-col md:flex-row items-center gap-3 w-full md:w-auto">
-                 <div className="relative w-full md:w-100">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                    <Input 
-                        placeholder="Search..." 
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-9 bg-white border-black focus-visible:ring-blue-200 h-9 transition-all hover:border-blue-200"
-                    />
-                 </div>
-                 
-                 <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-                    {selectedRows.length >= 2 && (
+                <div className="relative w-full md:w-100">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Input
+                    placeholder="Search..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-9 bg-white border-black focus-visible:ring-blue-200 h-9 transition-all hover:border-blue-200"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+                  {selectedRows.length >= 2 && (
                     <Button
                       onClick={handleBulkClick}
                       className="bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-200 transition-all duration-300 animate-in fade-in slide-in-from-right-4 h-9"
@@ -495,13 +573,75 @@ export default function SystemInfoPage() {
                 </div>
               </div>
             </CardHeader>
+
+            {/* Filter Dropdowns */}
+            <div className="px-6 py-4 bg-slate-50/50 border-b border-blue-50">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                {[
+                  { key: "regId", label: "Reg ID" },
+                  { key: "village", label: "Village" },
+                  { key: "block", label: "Block" },
+                  { key: "district", label: "District" },
+                  { key: "pumpType", label: "Pump Type" },
+                  { key: "company", label: "Company" },
+                ].map(({ key, label }) => (
+                  <div key={key} className="space-y-1.5">
+                    <Label className="text-xs text-slate-600">{label}</Label>
+                    <select
+                      value={filters[key]}
+                      onChange={(e) =>
+                        setFilters({ ...filters, [key]: e.target.value })
+                      }
+                      className="w-full h-9 px-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    >
+                      <option value="">All</option>
+                      {getUniquePendingValues(key).map((val) => (
+                        <option key={val} value={val}>
+                          {val}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setFilters({
+                    regId: "",
+                    village: "",
+                    block: "",
+                    district: "",
+                    pumpType: "",
+                    company: "",
+                  })
+                }
+                className="mt-3 text-xs"
+              >
+                Clear All Filters
+              </Button>
+            </div>
+
             <CardContent className="p-0">
               <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-220px)] relative">
                 <Table className="[&_th]:text-center [&_td]:text-center [&_td]:align-middle">
                   <TableHeader className="bg-gradient-to-r from-blue-50/50 to-cyan-50/50 sticky top-0 z-10">
                     <TableRow className="border-b border-blue-100 hover:bg-transparent">
                       <TableHead className="h-14 px-4 text-xs font-bold text-slate-600 uppercase tracking-wider whitespace-nowrap w-12">
-                          Select
+                        <div className="flex justify-center">
+                          <Checkbox
+                            checked={
+                              filteredPendingItems.length > 0 &&
+                              selectedRows.length ===
+                                filteredPendingItems.length
+                            }
+                            onCheckedChange={handleSelectAll}
+                            aria-label="Select all rows"
+                            className="checkbox-3d border-slate-400 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 h-5 w-5 shadow-sm transition-all duration-300 ease-out"
+                          />
+                        </div>
                       </TableHead>
                       <TableHead className="h-14 px-6 text-xs font-bold text-slate-600 uppercase tracking-wider whitespace-nowrap w-32">
                         Action
@@ -529,17 +669,20 @@ export default function SystemInfoPage() {
                         Pump Type
                       </TableHead>
                       <TableHead className="h-14 px-6 text-xs font-bold text-slate-600 uppercase tracking-wider whitespace-nowrap">
-                         Company
+                        Company
                       </TableHead>
                       <TableHead className="h-14 px-6 text-xs font-bold text-slate-600 uppercase tracking-wider whitespace-nowrap">
-                         Install Status
+                        Install Status
                       </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {isLoading ? (
                       Array.from({ length: 6 }).map((_, index) => (
-                        <TableRow key={`pending-skel-${index}`} className="animate-pulse">
+                        <TableRow
+                          key={`pending-skel-${index}`}
+                          className="animate-pulse"
+                        >
                           {Array.from({ length: 11 }).map((__, i) => (
                             <TableCell key={i}>
                               <div className="h-4 w-full bg-slate-200 rounded mx-auto"></div>
@@ -557,7 +700,9 @@ export default function SystemInfoPage() {
                             <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center">
                               <Settings className="h-6 w-6 text-slate-400" />
                             </div>
-                            <p>No pending system info tasks matching your search</p>
+                            <p>
+                              No pending system info tasks matching your search
+                            </p>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -569,9 +714,11 @@ export default function SystemInfoPage() {
                         >
                           <TableCell className="px-4">
                             <div className="flex justify-center">
-                              <Checkbox 
+                              <Checkbox
                                 checked={selectedRows.includes(item.serialNo)}
-                                onCheckedChange={(checked) => handleSelectRow(item.serialNo, checked)}
+                                onCheckedChange={(checked) =>
+                                  handleSelectRow(item.serialNo, checked)
+                                }
                                 aria-label={`Select row ${item.serialNo}`}
                                 className="checkbox-3d border-slate-400 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 h-5 w-5 shadow-sm transition-all duration-300 ease-out active:scale-75 hover:scale-110 data-[state=checked]:scale-110"
                               />
@@ -611,12 +758,12 @@ export default function SystemInfoPage() {
                             {item.pumpType}
                           </TableCell>
                           <TableCell className="text-slate-600">
-                             {item.company}
+                            {item.company}
                           </TableCell>
                           <TableCell>
-                             <Badge className="bg-green-100 text-green-700 hover:bg-green-200">
-                                Installed
-                             </Badge>
+                            <Badge className="bg-green-100 text-green-700 hover:bg-green-200">
+                              Installed
+                            </Badge>
                           </TableCell>
                         </TableRow>
                       ))
@@ -675,7 +822,7 @@ export default function SystemInfoPage() {
                               {item.district}
                             </p>
                           </div>
-                           <div>
+                          <div>
                             <span className="text-slate-400 text-[10px] uppercase font-semibold">
                               Company
                             </span>
@@ -683,7 +830,7 @@ export default function SystemInfoPage() {
                               {item.company}
                             </p>
                           </div>
-                           <div>
+                          <div>
                             <span className="text-slate-400 text-[10px] uppercase font-semibold">
                               Pump Type
                             </span>
@@ -728,16 +875,16 @@ export default function SystemInfoPage() {
               </div>
 
               <div className="flex flex-col md:flex-row items-center gap-3 w-full md:w-auto">
-                 <div className="relative w-full md:w-100">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                    <Input 
-                        placeholder="Search..." 
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-9 bg-white border-black focus-visible:ring-blue-200 h-9 transition-all hover:border-blue-200"
-                    />
-                 </div>
-                 <Badge
+                <div className="relative w-full md:w-100">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Input
+                    placeholder="Search..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-9 bg-white border-black focus-visible:ring-blue-200 h-9 transition-all hover:border-blue-200"
+                  />
+                </div>
+                <Badge
                   variant="outline"
                   className="bg-blue-100 text-blue-700 border-blue-200 px-3 py-1 h-9 flex items-center whitespace-nowrap"
                 >
@@ -745,19 +892,69 @@ export default function SystemInfoPage() {
                 </Badge>
               </div>
             </CardHeader>
+
+            {/* Filter Dropdowns */}
+            <div className="px-6 py-4 bg-slate-50/50 border-b border-blue-50">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                {[
+                  { key: "regId", label: "Reg ID" },
+                  { key: "village", label: "Village" },
+                  { key: "block", label: "Block" },
+                  { key: "district", label: "District" },
+                  { key: "pumpType", label: "Pump Type" },
+                  { key: "company", label: "Company" },
+                ].map(({ key, label }) => (
+                  <div key={key} className="space-y-1.5">
+                    <Label className="text-xs text-slate-600">{label}</Label>
+                    <select
+                      value={filters[key]}
+                      onChange={(e) =>
+                        setFilters({ ...filters, [key]: e.target.value })
+                      }
+                      className="w-full h-9 px-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    >
+                      <option value="">All</option>
+                      {getUniqueHistoryValues(key).map((val) => (
+                        <option key={val} value={val}>
+                          {val}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setFilters({
+                    regId: "",
+                    village: "",
+                    block: "",
+                    district: "",
+                    pumpType: "",
+                    company: "",
+                  })
+                }
+                className="mt-3 text-xs"
+              >
+                Clear All Filters
+              </Button>
+            </div>
+
             <CardContent className="p-0">
               <div className="hidden md:block overflow-x-auto overflow-y-auto max-h-[calc(100vh-220px)] relative">
                 <Table className="[&_th]:text-center [&_td]:text-center [&_td]:align-middle">
                   <TableHeader className="bg-gradient-to-r from-blue-50/50 to-cyan-50/50 sticky top-0 z-10">
                     <TableRow className="border-b border-blue-100 hover:bg-transparent">
-
                       <TableHead className="h-14 px-6 text-xs font-bold text-slate-600 uppercase tracking-wider whitespace-nowrap">
                         Reg ID
                       </TableHead>
                       <TableHead className="h-14 px-6 text-xs font-bold text-slate-600 uppercase tracking-wider whitespace-nowrap">
                         Beneficiary
                       </TableHead>
-                       <TableHead className="h-14 px-6 text-xs font-bold text-slate-600 uppercase tracking-wider whitespace-nowrap">
+                      <TableHead className="h-14 px-6 text-xs font-bold text-slate-600 uppercase tracking-wider whitespace-nowrap">
                         Village
                       </TableHead>
                       <TableHead className="h-14 px-6 text-xs font-bold text-slate-600 uppercase tracking-wider whitespace-nowrap">
@@ -766,7 +963,7 @@ export default function SystemInfoPage() {
                       <TableHead className="h-14 px-6 text-xs font-bold text-slate-600 uppercase tracking-wider whitespace-nowrap">
                         Controller Make
                       </TableHead>
-                       <TableHead className="h-14 px-6 text-xs font-bold text-slate-600 uppercase tracking-wider whitespace-nowrap">
+                      <TableHead className="h-14 px-6 text-xs font-bold text-slate-600 uppercase tracking-wider whitespace-nowrap">
                         Pump Make
                       </TableHead>
                       <TableHead className="h-14 px-6 text-xs font-bold text-slate-600 uppercase tracking-wider whitespace-nowrap">
@@ -780,7 +977,10 @@ export default function SystemInfoPage() {
                   <TableBody>
                     {isLoading ? (
                       Array.from({ length: 6 }).map((_, index) => (
-                        <TableRow key={`history-skel-${index}`} className="animate-pulse">
+                        <TableRow
+                          key={`history-skel-${index}`}
+                          className="animate-pulse"
+                        >
                           {Array.from({ length: 8 }).map((__, i) => (
                             <TableCell key={i}>
                               <div className="h-4 w-full bg-slate-200 rounded mx-auto"></div>
@@ -798,7 +998,11 @@ export default function SystemInfoPage() {
                             <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center">
                               <CheckCircle2 className="h-6 w-6 text-slate-400" />
                             </div>
-                            <p>{historyItems.length === 0 ? "No processed records yet." : "No history records found matching your search."}</p>
+                            <p>
+                              {historyItems.length === 0
+                                ? "No processed records yet."
+                                : "No history records found matching your search."}
+                            </p>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -808,26 +1012,25 @@ export default function SystemInfoPage() {
                           key={item.serialNo}
                           className="hover:bg-blue-50/30 transition-colors"
                         >
-
                           <TableCell className="whitespace-nowrap font-mono text-xs text-slate-600">
                             {item.regId}
                           </TableCell>
                           <TableCell className="whitespace-nowrap font-medium text-slate-800">
                             {item.beneficiaryName}
                           </TableCell>
-                           <TableCell className="whitespace-nowrap text-slate-600">
+                          <TableCell className="whitespace-nowrap text-slate-600">
                             {item.village}
                           </TableCell>
                           <TableCell className="whitespace-nowrap text-slate-600">
                             {item.moduleMake || "-"}
                           </TableCell>
-                           <TableCell className="whitespace-nowrap text-slate-600">
+                          <TableCell className="whitespace-nowrap text-slate-600">
                             {item.controllerMake || "-"}
                           </TableCell>
-                           <TableCell className="whitespace-nowrap text-slate-600">
+                          <TableCell className="whitespace-nowrap text-slate-600">
                             {item.pumpMake || "-"}
                           </TableCell>
-                           <TableCell className="whitespace-nowrap text-slate-600">
+                          <TableCell className="whitespace-nowrap text-slate-600">
                             {item.structureMake || "-"}
                           </TableCell>
                           <TableCell className="whitespace-nowrap">
@@ -842,7 +1045,7 @@ export default function SystemInfoPage() {
                 </Table>
               </div>
 
-               {/* Mobile View History */}
+              {/* Mobile View History */}
               <div className="md:hidden space-y-4 p-4 bg-slate-50">
                 {historyItems.length === 0 ? (
                   <div className="text-center py-12 text-slate-500 bg-white rounded-xl border border-dashed border-slate-200">
@@ -869,13 +1072,13 @@ export default function SystemInfoPage() {
                           </Badge>
                         </div>
 
-                         <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs border-t border-b py-3 my-2 border-slate-100">
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs border-t border-b py-3 my-2 border-slate-100">
                           <div className="flex flex-col">
                             <span className="text-slate-400 text-[10px] uppercase font-semibold">
                               Module Make
                             </span>
                             <span className="font-medium text-slate-700">
-                               {item.moduleMake || "-"}
+                              {item.moduleMake || "-"}
                             </span>
                           </div>
                           <div className="flex flex-col">
@@ -883,10 +1086,10 @@ export default function SystemInfoPage() {
                               Controller
                             </span>
                             <span className="font-medium text-slate-700">
-                               {item.controllerMake || "-"}
+                              {item.controllerMake || "-"}
                             </span>
                           </div>
-                         </div>
+                        </div>
                       </CardContent>
                     </Card>
                   ))
@@ -899,156 +1102,234 @@ export default function SystemInfoPage() {
 
       {/* ====================== PROCESSING DIALOG ====================== */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent showCloseButton={!isSuccess} className={`max-w-4xl max-h-[90vh] overflow-y-auto p-0 gap-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] ${isSuccess ? "bg-transparent !shadow-none !border-none" : "bg-white"}`}>
-        {isSuccess ? (
+        <DialogContent
+          showCloseButton={!isSuccess}
+          className={`max-w-4xl max-h-[90vh] overflow-y-auto p-0 gap-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] ${
+            isSuccess ? "bg-transparent !shadow-none !border-none" : "bg-white"
+          }`}
+        >
+          {isSuccess ? (
             <div className="flex flex-col items-center justify-center w-full p-8 text-center space-y-6 animate-in fade-in duration-300">
-                <div className="rounded-full bg-white p-5 shadow-2xl shadow-white/20 ring-8 ring-white/10 animate-in zoom-in duration-500 ease-out">
-                    <CheckCircle2 className="h-16 w-16 text-green-600 scale-110" />
-                </div>
-                <h2 className="text-3xl font-bold text-white drop-shadow-md animate-in slide-in-from-bottom-4 fade-in duration-500 delay-150 ease-out tracking-wide">
-                    Saved Successfully!
-                </h2>
-            </div>
-        ) : (
-            <>
-          <DialogHeader className="p-6 pb-2 border-b border-blue-100 bg-blue-50/30">
-            <DialogTitle className="text-xl font-bold bg-linear-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent flex items-center gap-2">
-              <span className="bg-blue-100 p-1.5 rounded-md">
-                <Settings className="h-4 w-4 text-blue-600" />
-              </span>
-              Update System Information
-            </DialogTitle>
-            <DialogDescription className="text-slate-500 ml-10">
-              {isBulk ? (
-                  <span>Applying changes to <span className="font-bold text-blue-700">{selectedRows.length} selected items</span>. All fields below will be updated for these items.</span>
-              ) : (
-                  <span>Update technical details for <span className="font-semibold text-slate-700">{selectedItem?.beneficiaryName}</span> <span className="font-mono text-xs bg-slate-100 px-1 py-0.5 rounded text-slate-600 border border-slate-200">{selectedItem?.serialNo}</span></span>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-
-          {(selectedItem || isBulk) && (
-            <div className="grid gap-6 p-6">
-              
-               <div className="space-y-4">
-                <h3 className="text-sm font-bold text-slate-800 border-l-4 border-cyan-500 pl-3 uppercase tracking-wide flex items-center gap-2">
-                  Technical Specifications
-                </h3>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                   {/* Modules */}
-                   <div className="space-y-2 lg:col-span-3">
-                      <Label className="text-sm font-medium text-slate-700">Module Make</Label>
-                      <Input
-                        value={formData.moduleMake}
-                        onChange={(e) => setFormData({...formData, moduleMake: e.target.value})}
-                        placeholder="e.g. Adani/Tata"
-                        className="h-10 border-slate-200 focus:border-cyan-400"
-                      />
-                   </div>
-
-                   {/* Module Serial Numbers 1-9 */}
-                   {[1,2,3,4,5,6,7,8,9].map(num => (
-                       <div key={num} className="space-y-2">
-                          <Label className="text-sm font-medium text-slate-700">Module Serial No {num}</Label>
-                           <Input
-                             value={formData[`moduleSerialNo${num}`]}
-                             onChange={(e) => setFormData({...formData, [`moduleSerialNo${num}`]: e.target.value})}
-                             placeholder={`Serial No ${num}`}
-                             className="h-10 border-slate-200 focus:border-cyan-400"
-                           />
-                       </div>
-                   ))}
-
-                   {/* Other Components */}
-                   <div className="space-y-2">
-                      <Label className="text-sm font-medium text-slate-700">Controller Make</Label>
-                      <Input
-                        value={formData.controllerMake}
-                        onChange={(e) => setFormData({...formData, controllerMake: e.target.value})}
-                         className="h-10 border-slate-200 focus:border-cyan-400"
-                      />
-                   </div>
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium text-slate-700">Controller No</Label>
-                      <Input
-                        value={formData.controllerNo}
-                        onChange={(e) => setFormData({...formData, controllerNo: e.target.value})}
-                         className="h-10 border-slate-200 focus:border-cyan-400"
-                      />
-                   </div>
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium text-slate-700">RMS No</Label>
-                      <Input
-                        value={formData.rmsNo}
-                        onChange={(e) => setFormData({...formData, rmsNo: e.target.value})}
-                         className="h-10 border-slate-200 focus:border-cyan-400"
-                      />
-                   </div>
-                   <div className="space-y-2">
-                      <Label className="text-sm font-medium text-slate-700">Pump Make</Label>
-                      <Input
-                        value={formData.pumpMake}
-                        onChange={(e) => setFormData({...formData, pumpMake: e.target.value})}
-                         className="h-10 border-slate-200 focus:border-cyan-400"
-                      />
-                   </div>
-                   <div className="space-y-2">
-                      <Label className="text-sm font-medium text-slate-700">Pump Serial No</Label>
-                      <Input
-                        value={formData.pumpSerialNo}
-                        onChange={(e) => setFormData({...formData, pumpSerialNo: e.target.value})}
-                         className="h-10 border-slate-200 focus:border-cyan-400"
-                      />
-                   </div>
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium text-slate-700">Motor Serial No</Label>
-                      <Input
-                        value={formData.motorSerialNo}
-                        onChange={(e) => setFormData({...formData, motorSerialNo: e.target.value})}
-                         className="h-10 border-slate-200 focus:border-cyan-400"
-                      />
-                   </div>
-                   <div className="space-y-2">
-                      <Label className="text-sm font-medium text-slate-700">Structure Make</Label>
-                      <Input
-                        value={formData.structureMake}
-                        onChange={(e) => setFormData({...formData, structureMake: e.target.value})}
-                         className="h-10 border-slate-200 focus:border-cyan-400"
-                      />
-                   </div>
-                </div>
-               </div>
-
-              <div className="flex justify-end gap-3 mt-4 pt-6 border-t border-slate-100 pb-6 pr-6">
-                <Button
-                  variant="outline"
-                  onClick={() => setIsDialogOpen(false)}
-                  disabled={isSubmitting}
-                  className="h-10 px-6 border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-slate-800"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleSubmit}
-                  disabled={isSubmitting}
-                  className="h-10 px-8 bg-linear-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 shadow-lg shadow-blue-500/20 transition-all"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    "Save System Info"
-                  )}
-                </Button>
+              <div className="rounded-full bg-white p-5 shadow-2xl shadow-white/20 ring-8 ring-white/10 animate-in zoom-in duration-500 ease-out">
+                <CheckCircle2 className="h-16 w-16 text-green-600 scale-110" />
               </div>
+              <h2 className="text-3xl font-bold text-white drop-shadow-md animate-in slide-in-from-bottom-4 fade-in duration-500 delay-150 ease-out tracking-wide">
+                Saved Successfully!
+              </h2>
             </div>
+          ) : (
+            <>
+              <DialogHeader className="p-6 pb-2 border-b border-blue-100 bg-blue-50/30">
+                <DialogTitle className="text-xl font-bold bg-linear-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent flex items-center gap-2">
+                  <span className="bg-blue-100 p-1.5 rounded-md">
+                    <Settings className="h-4 w-4 text-blue-600" />
+                  </span>
+                  Update System Information
+                </DialogTitle>
+                <DialogDescription className="text-slate-500 ml-10">
+                  {isBulk ? (
+                    <span>
+                      Applying changes to{" "}
+                      <span className="font-bold text-blue-700">
+                        {selectedRows.length} selected items
+                      </span>
+                      . All fields below will be updated for these items.
+                    </span>
+                  ) : (
+                    <span>
+                      Update technical details for{" "}
+                      <span className="font-semibold text-slate-700">
+                        {selectedItem?.beneficiaryName}
+                      </span>{" "}
+                      <span className="font-mono text-xs bg-slate-100 px-1 py-0.5 rounded text-slate-600 border border-slate-200">
+                        {selectedItem?.serialNo}
+                      </span>
+                    </span>
+                  )}
+                </DialogDescription>
+              </DialogHeader>
+
+              {(selectedItem || isBulk) && (
+                <div className="grid gap-6 p-6">
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-bold text-slate-800 border-l-4 border-cyan-500 pl-3 uppercase tracking-wide flex items-center gap-2">
+                      Technical Specifications
+                    </h3>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                      {/* Modules */}
+                      <div className="space-y-2 lg:col-span-3">
+                        <Label className="text-sm font-medium text-slate-700">
+                          Module Make
+                        </Label>
+                        <Input
+                          value={formData.moduleMake}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              moduleMake: e.target.value,
+                            })
+                          }
+                          placeholder="e.g. Adani/Tata"
+                          className="h-10 border-slate-200 focus:border-cyan-400"
+                        />
+                      </div>
+
+                      {/* Module Serial Numbers 1-9 */}
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+                        <div key={num} className="space-y-2">
+                          <Label className="text-sm font-medium text-slate-700">
+                            Module Serial No {num}
+                          </Label>
+                          <Input
+                            value={formData[`moduleSerialNo${num}`]}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                [`moduleSerialNo${num}`]: e.target.value,
+                              })
+                            }
+                            placeholder={`Serial No ${num}`}
+                            className="h-10 border-slate-200 focus:border-cyan-400"
+                          />
+                        </div>
+                      ))}
+
+                      {/* Other Components */}
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium text-slate-700">
+                          Controller Make
+                        </Label>
+                        <Input
+                          value={formData.controllerMake}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              controllerMake: e.target.value,
+                            })
+                          }
+                          className="h-10 border-slate-200 focus:border-cyan-400"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium text-slate-700">
+                          Controller No
+                        </Label>
+                        <Input
+                          value={formData.controllerNo}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              controllerNo: e.target.value,
+                            })
+                          }
+                          className="h-10 border-slate-200 focus:border-cyan-400"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium text-slate-700">
+                          RMS No
+                        </Label>
+                        <Input
+                          value={formData.rmsNo}
+                          onChange={(e) =>
+                            setFormData({ ...formData, rmsNo: e.target.value })
+                          }
+                          className="h-10 border-slate-200 focus:border-cyan-400"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium text-slate-700">
+                          Pump Make
+                        </Label>
+                        <Input
+                          value={formData.pumpMake}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              pumpMake: e.target.value,
+                            })
+                          }
+                          className="h-10 border-slate-200 focus:border-cyan-400"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium text-slate-700">
+                          Pump Serial No
+                        </Label>
+                        <Input
+                          value={formData.pumpSerialNo}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              pumpSerialNo: e.target.value,
+                            })
+                          }
+                          className="h-10 border-slate-200 focus:border-cyan-400"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium text-slate-700">
+                          Motor Serial No
+                        </Label>
+                        <Input
+                          value={formData.motorSerialNo}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              motorSerialNo: e.target.value,
+                            })
+                          }
+                          className="h-10 border-slate-200 focus:border-cyan-400"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium text-slate-700">
+                          Structure Make
+                        </Label>
+                        <Input
+                          value={formData.structureMake}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              structureMake: e.target.value,
+                            })
+                          }
+                          className="h-10 border-slate-200 focus:border-cyan-400"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-3 mt-4 pt-6 border-t border-slate-100 pb-6 pr-6">
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsDialogOpen(false)}
+                      disabled={isSubmitting}
+                      className="h-10 px-6 border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-slate-800"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={handleSubmit}
+                      disabled={isSubmitting}
+                      className="h-10 px-8 bg-linear-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 shadow-lg shadow-blue-500/20 transition-all"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        "Save System Info"
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
-        </>
-      )}
-      </DialogContent>
+        </DialogContent>
       </Dialog>
     </div>
   );

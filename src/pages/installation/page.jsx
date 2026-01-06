@@ -27,7 +27,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Wrench, Upload, FileCheck, Pencil, Loader2, CheckCircle2, Search } from "lucide-react";
+import {
+  Wrench,
+  Upload,
+  FileCheck,
+  Pencil,
+  Loader2,
+  CheckCircle2,
+  Search,
+} from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 
 export default function InstallationPage() {
@@ -42,17 +50,76 @@ export default function InstallationPage() {
   const [isBulk, setIsBulk] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
-  const filteredPendingItems = pendingItems.filter((item) =>
-    Object.values(item).some((value) =>
-      String(value).toLowerCase().includes(searchTerm.toLowerCase())
-    )
-  );
+  const [filters, setFilters] = useState({
+    regId: "",
+    village: "",
+    block: "",
+    district: "",
+    pumpSource: "",
+    pumpType: "",
+    company: "",
+  });
 
-  const filteredHistoryItems = historyItems.filter((item) =>
-    Object.values(item).some((value) =>
+  const getUniquePendingValues = (field) => {
+    const values = pendingItems
+      .map((item) => item[field])
+      .filter((v) => v && v !== "-");
+    return [...new Set(values)].sort();
+  };
+
+  const getUniqueHistoryValues = (field) => {
+    const values = historyItems
+      .map((item) => item[field])
+      .filter((v) => v && v !== "-");
+    return [...new Set(values)].sort();
+  };
+
+  // const filteredPendingItems = pendingItems.filter((item) =>
+  //   Object.values(item).some((value) =>
+  //     String(value).toLowerCase().includes(searchTerm.toLowerCase())
+  //   )
+  // );
+
+  // const filteredHistoryItems = historyItems.filter((item) =>
+  //   Object.values(item).some((value) =>
+  //     String(value).toLowerCase().includes(searchTerm.toLowerCase())
+  //   )
+  // );
+
+  const filteredPendingItems = pendingItems.filter((item) => {
+    const matchesSearch = Object.values(item).some((value) =>
       String(value).toLowerCase().includes(searchTerm.toLowerCase())
-    )
-  );
+    );
+
+    const matchesFilters =
+      (!filters.regId || item.regId === filters.regId) &&
+      (!filters.village || item.village === filters.village) &&
+      (!filters.block || item.block === filters.block) &&
+      (!filters.district || item.district === filters.district) &&
+      (!filters.pumpSource || item.pumpSource === filters.pumpSource) &&
+      (!filters.pumpType || item.pumpType === filters.pumpType) &&
+      (!filters.company || item.company === filters.company);
+
+    return matchesSearch && matchesFilters;
+  });
+
+  const filteredHistoryItems = historyItems.filter((item) => {
+    const matchesSearch = Object.values(item).some((value) =>
+      String(value).toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    const matchesFilters =
+      (!filters.regId || item.regId === filters.regId) &&
+      (!filters.village || item.village === filters.village) &&
+      (!filters.block || item.block === filters.block) &&
+      (!filters.district || item.district === filters.district) &&
+      (!filters.pumpSource || item.pumpSource === filters.pumpSource) &&
+      (!filters.pumpType || item.pumpType === filters.pumpType) &&
+      (!filters.company || item.company === filters.company);
+
+    return matchesSearch && matchesFilters;
+  });
+
   const [sheetHeaders, setSheetHeaders] = useState({});
   const [columnMapping, setColumnMapping] = useState({});
   const [isLoaded, setIsLoaded] = useState(false);
@@ -107,12 +174,12 @@ export default function InstallationPage() {
         setIsLoading(false);
         return;
       }
-      const rawHeaders = rawRows[headerRowIndex].map(h => String(h).trim());
-      const headers = rawHeaders.map(h => h.toLowerCase());
+      const rawHeaders = rawRows[headerRowIndex].map((h) => String(h).trim());
+      const headers = rawHeaders.map((h) => h.toLowerCase());
 
       const findCol = (keys) =>
-        headers.findIndex(h =>
-          keys.every(k => h.replace(/\s+/g, "").includes(k))
+        headers.findIndex((h) =>
+          keys.every((k) => h.replace(/\s+/g, "").includes(k))
         );
 
       // 🔹 COLUMN MAPPING (Foundation + Installation)
@@ -142,14 +209,14 @@ export default function InstallationPage() {
 
         fdMaterialAgeing: findCol(["fd", "ageing"]),
         fdMaterialReceivingDate: findCol(["fd", "receiving"]),
-        
+
         // Foundation Challan - Prioritize specific "FD Challan" or first "Challan" found
         challanLink: (() => {
-             const i = findCol(["fd", "challan"]);
-             if (i !== -1) return i;
-             return findCol(["challan"]); // Likely the first one
+          const i = findCol(["fd", "challan"]);
+          if (i !== -1) return i;
+          return findCol(["challan"]); // Likely the first one
         })(),
-        
+
         foundationStatus: findCol(["foundation", "status"]),
         foundationCompletionDate: (() => {
           const i = findCol(["foundation", "completion"]);
@@ -165,49 +232,54 @@ export default function InstallationPage() {
 
         // 🔹 INSTALLATION COLUMNS (Restored & Robust)
         installationMaterialAgeing: (() => {
-           const i = findCol(["im", "ageing"]);
-           if (i !== -1) return i;
-           const j = findCol(["ins", "ageing"]);
-           if (j !== -1) return j;
-           return findCol(["installation", "ageing"]);
+          const i = findCol(["im", "ageing"]);
+          if (i !== -1) return i;
+          const j = findCol(["ins", "ageing"]);
+          if (j !== -1) return j;
+          return findCol(["installation", "ageing"]);
         })(),
         installationMaterialReceivingDate: (() => {
-           const i = findCol(["im", "receiving"]);
-           if (i !== -1) return i;
-           const j = findCol(["ins", "receiving"]);
-           if (j !== -1) return j;
-           return findCol(["installation", "receiving"]);
+          const i = findCol(["im", "receiving"]);
+          if (i !== -1) return i;
+          const j = findCol(["ins", "receiving"]);
+          if (j !== -1) return j;
+          return findCol(["installation", "receiving"]);
         })(),
         installationStatus: findCol(["installation", "status"]),
-        
+
         // Installation Challan - Must be distinct from Foundation Challan
         installationChallanLink: (() => {
-           // 1. Try specific "Ins Challan"
-           const insSpecific = findCol(["ins", "challan"]);
-           if (insSpecific !== -1) return insSpecific;
+          // 1. Try specific "Ins Challan"
+          const insSpecific = findCol(["ins", "challan"]);
+          if (insSpecific !== -1) return insSpecific;
 
-           // 2. Try generic "Challan Link" but ensure it's NOT the foundation one
-           // Find ALL columns matching "challan"
-           const allChallanIndices = headers.map((h, i) => 
-               h.includes("challan") ? i : -1
-           ).filter(i => i !== -1);
+          // 2. Try generic "Challan Link" but ensure it's NOT the foundation one
+          // Find ALL columns matching "challan"
+          const allChallanIndices = headers
+            .map((h, i) => (h.includes("challan") ? i : -1))
+            .filter((i) => i !== -1);
 
-           // If we have multiple, assume the *last* one or the one closest to Installation Status is correct
-           // Or, simply, if we found a foundation challan earlier, pick the next one.
-           // However, simple logic: Pick the one that is NOT the same as the Foundation one we found above.
-           
-           const fdChallanIndex = findCol(["fd", "challan"]) !== -1 ? findCol(["fd", "challan"]) : findCol(["challan"]);
-           
-           const otherChallan = allChallanIndices.find(i => i !== fdChallanIndex);
-           if (otherChallan !== undefined) return otherChallan;
-           
-           return -1;
+          // If we have multiple, assume the *last* one or the one closest to Installation Status is correct
+          // Or, simply, if we found a foundation challan earlier, pick the next one.
+          // However, simple logic: Pick the one that is NOT the same as the Foundation one we found above.
+
+          const fdChallanIndex =
+            findCol(["fd", "challan"]) !== -1
+              ? findCol(["fd", "challan"])
+              : findCol(["challan"]);
+
+          const otherChallan = allChallanIndices.find(
+            (i) => i !== fdChallanIndex
+          );
+          if (otherChallan !== undefined) return otherChallan;
+
+          return -1;
         })(),
 
         installationCompletionDate: (() => {
-           const i = findCol(["ic", "date"]);
-           if (i !== -1) return i;
-           return findCol(["installation", "completion"]);
+          const i = findCol(["ic", "date"]);
+          if (i !== -1) return i;
+          return findCol(["installation", "completion"]);
         })(),
         insPhotoOkDate: findCol(["ins", "photo"]),
       };
@@ -254,7 +326,8 @@ export default function InstallationPage() {
 
           // 🔹 INSTALLATION DATA
           installationMaterialAgeing: row[colMap.installationMaterialAgeing],
-          installationMaterialReceivingDate: row[colMap.installationMaterialReceivingDate],
+          installationMaterialReceivingDate:
+            row[colMap.installationMaterialReceivingDate],
           installationChallanLink: row[colMap.installationChallanLink],
           installationStatus: row[colMap.installationStatus],
           installationCompletionDate: row[colMap.installationCompletionDate],
@@ -267,7 +340,8 @@ export default function InstallationPage() {
           rowIndex: i + 1,
         };
 
-        const isInstallationDone = item.actual4 && String(item.actual4).trim() !== "";
+        const isInstallationDone =
+          item.actual4 && String(item.actual4).trim() !== "";
         const isPlanned4 = item.planned4 && String(item.planned4).trim() !== "";
 
         // 🔹 FILTER LOGIC
@@ -280,7 +354,6 @@ export default function InstallationPage() {
 
       setPendingItems(pending);
       setHistoryItems(history);
-
     } catch (err) {
       console.error("Installation fetch error:", err);
     } finally {
@@ -321,19 +394,19 @@ export default function InstallationPage() {
   };
 
   const handleSelectAll = (checked) => {
-      if (checked) {
-          setSelectedRows(filteredPendingItems.map((item) => item.serialNo));
-      } else {
-          setSelectedRows([]);
-      }
+    if (checked) {
+      setSelectedRows(filteredPendingItems.map((item) => item.serialNo));
+    } else {
+      setSelectedRows([]);
+    }
   };
 
   const handleSelectRow = (serialNo, checked) => {
-      if (checked) {
-          setSelectedRows((prev) => [...prev, serialNo]);
-      } else {
-          setSelectedRows((prev) => prev.filter((id) => id !== serialNo));
-      }
+    if (checked) {
+      setSelectedRows((prev) => [...prev, serialNo]);
+    } else {
+      setSelectedRows((prev) => prev.filter((id) => id !== serialNo));
+    }
   };
 
   const handleBulkClick = () => {
@@ -386,79 +459,108 @@ export default function InstallationPage() {
       // 1. UPLOAD FILE ONCE (if any)
       let finalFileUrl = "";
       if (formData.installationChallanFileObj) {
-         try {
-           const base64 = await getBase64(formData.installationChallanFileObj);
-           const uploadBody = new URLSearchParams({
-             action: "uploadFile",
-             base64Data: base64,
-             fileName: `BULK_${formData.installationChallanFileObj.name}`, 
-             mimeType: formData.installationChallanFileObj.type,
-             folderId: driveFolderId || "1pqyJUlUD0zwnojUvNezJgxzim8gjUfmM",
-           });
+        try {
+          const base64 = await getBase64(formData.installationChallanFileObj);
+          const uploadBody = new URLSearchParams({
+            action: "uploadFile",
+            base64Data: base64,
+            fileName: `BULK_${formData.installationChallanFileObj.name}`,
+            mimeType: formData.installationChallanFileObj.type,
+            folderId: driveFolderId || "1pqyJUlUD0zwnojUvNezJgxzim8gjUfmM",
+          });
 
-           const upRes = await fetch(scriptUrl, { method: "POST", body: uploadBody });
-           const upResult = await upRes.json();
-           if (upResult.success && upResult.fileUrl) {
-             finalFileUrl = upResult.fileUrl;
-           } else {
-             console.error("File upload failed", upResult);
-             alert("Warning: File upload failed, but proceeding with data update. " + (upResult.message || ""));
-           }
-         } catch (uploadError) {
-           console.error("Upload error:", uploadError);
-           alert("Warning: File upload error. Proceeding with text data only.");
-         }
+          const upRes = await fetch(scriptUrl, {
+            method: "POST",
+            body: uploadBody,
+          });
+          const upResult = await upRes.json();
+          if (upResult.success && upResult.fileUrl) {
+            finalFileUrl = upResult.fileUrl;
+          } else {
+            console.error("File upload failed", upResult);
+            alert(
+              "Warning: File upload failed, but proceeding with data update. " +
+                (upResult.message || "")
+            );
+          }
+        } catch (uploadError) {
+          console.error("Upload error:", uploadError);
+          alert("Warning: File upload error. Proceeding with text data only.");
+        }
       }
 
       // 2. IDENTIFY ITEMS
       let itemsToProcess = [];
       if (isBulk) {
-          itemsToProcess = pendingItems.filter(item => selectedRows.includes(item.serialNo));
+        itemsToProcess = pendingItems.filter((item) =>
+          selectedRows.includes(item.serialNo)
+        );
       } else {
-          itemsToProcess = [selectedItem];
+        itemsToProcess = [selectedItem];
       }
 
       // 3. PREPARE REQUESTS
       const updatePromises = itemsToProcess.map(async (item) => {
-          const rowUpdate = {};
-          const addToUpdate = (key, value) => {
-            const idx = columnMapping[key];
-            if (idx !== undefined && idx >= 0 && value !== undefined && value !== null && value !== "") {
-              rowUpdate[idx] = value;
-            }
-          };
-
-          // Fields
-          addToUpdate("installationMaterialAgeing", formData.installationMaterialAgeing);
-          addToUpdate("installationMaterialReceivingDate", formData.installationMaterialReceivingDate);
-          addToUpdate("installationStatus", formData.installationStatus);
-          addToUpdate("installationCompletionDate", formData.installationCompletionDate);
-          addToUpdate("insPhotoOkDate", formData.insPhotoOkDate);
-
-          // Timestamp
-          const now = new Date();
-          const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")} ` +
-                            `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
-          addToUpdate("actual4", timestamp);
-
-          // File Link
-          if (finalFileUrl) {
-            addToUpdate("installationChallanLink", finalFileUrl);
+        const rowUpdate = {};
+        const addToUpdate = (key, value) => {
+          const idx = columnMapping[key];
+          if (
+            idx !== undefined &&
+            idx >= 0 &&
+            value !== undefined &&
+            value !== null &&
+            value !== ""
+          ) {
+            rowUpdate[idx] = value;
           }
+        };
 
-          const updatePayload = new URLSearchParams({
-            action: "update",
-            sheetName: "Project Main",
-            id: sheetId,
-            rowIndex: item.rowIndex,
-            rowData: JSON.stringify(rowUpdate),
-          });
+        // Fields
+        addToUpdate(
+          "installationMaterialAgeing",
+          formData.installationMaterialAgeing
+        );
+        addToUpdate(
+          "installationMaterialReceivingDate",
+          formData.installationMaterialReceivingDate
+        );
+        addToUpdate("installationStatus", formData.installationStatus);
+        addToUpdate(
+          "installationCompletionDate",
+          formData.installationCompletionDate
+        );
+        addToUpdate("insPhotoOkDate", formData.insPhotoOkDate);
 
-          return fetch(scriptUrl, {
-            method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: updatePayload.toString(),
-          }).then(res => res.json());
+        // Timestamp
+        const now = new Date();
+        const timestamp =
+          `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(
+            2,
+            "0"
+          )}-${String(now.getDate()).padStart(2, "0")} ` +
+          `${String(now.getHours()).padStart(2, "0")}:${String(
+            now.getMinutes()
+          ).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
+        addToUpdate("actual4", timestamp);
+
+        // File Link
+        if (finalFileUrl) {
+          addToUpdate("installationChallanLink", finalFileUrl);
+        }
+
+        const updatePayload = new URLSearchParams({
+          action: "update",
+          sheetName: "Project Main",
+          id: sheetId,
+          rowIndex: item.rowIndex,
+          rowData: JSON.stringify(rowUpdate),
+        });
+
+        return fetch(scriptUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: updatePayload.toString(),
+        }).then((res) => res.json());
       });
 
       // 4. WAIT FOR ALL
@@ -469,7 +571,6 @@ export default function InstallationPage() {
       setIsBulk(false);
       setIsSuccess(true);
       fetchData();
-
     } catch (error) {
       console.error("Submission error:", error);
       alert("Failed to Submit: " + error.message);
@@ -480,8 +581,6 @@ export default function InstallationPage() {
 
   return (
     <div className="space-y-8 p-6 md:p-8 max-w-[1600px] mx-auto bg-slate-50/50 min-h-screen animate-fade-in-up">
-
-
       <Tabs
         defaultValue="pending"
         className="w-full"
@@ -524,18 +623,18 @@ export default function InstallationPage() {
               </div>
 
               <div className="flex flex-col md:flex-row items-center gap-3 w-full md:w-auto">
-                 <div className="relative w-full md:w-100">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                    <Input 
-                        placeholder="Search..." 
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-9 bg-white border-black focus-visible:ring-blue-200 h-9 transition-all hover:border-blue-200"
-                    />
-                 </div>
-                 
-                 <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-                    {selectedRows.length >= 2 && (
+                <div className="relative w-full md:w-100">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Input
+                    placeholder="Search..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-9 bg-white border-black focus-visible:ring-blue-200 h-9 transition-all hover:border-blue-200"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+                  {selectedRows.length >= 2 && (
                     <Button
                       onClick={handleBulkClick}
                       className="bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-200 transition-all duration-300 animate-in fade-in slide-in-from-right-4 h-9"
@@ -554,14 +653,78 @@ export default function InstallationPage() {
                 </div>
               </div>
             </CardHeader>
+
+            {/* Filter Dropdowns */}
+            <div className="px-6 py-4 bg-slate-50/50 border-b border-blue-50">
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+                {[
+                  { key: "regId", label: "Reg ID" },
+                  { key: "village", label: "Village" },
+                  { key: "block", label: "Block" },
+                  { key: "district", label: "District" },
+                  { key: "pumpSource", label: "Pump Source" },
+                  { key: "pumpType", label: "Pump Type" },
+                  { key: "company", label: "Company" },
+                ].map(({ key, label }) => (
+                  <div key={key} className="space-y-1.5">
+                    <Label className="text-xs text-slate-600">{label}</Label>
+                    <select
+                      value={filters[key]}
+                      onChange={(e) =>
+                        setFilters({ ...filters, [key]: e.target.value })
+                      }
+                      className="w-full h-9 px-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    >
+                      <option value="">All</option>
+                      {getUniquePendingValues(key).map((val) => (
+                        <option key={val} value={val}>
+                          {val}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setFilters({
+                    regId: "",
+                    village: "",
+                    block: "",
+                    district: "",
+                    pumpSource: "",
+                    pumpType: "",
+                    company: "",
+                  })
+                }
+                className="mt-3 text-xs"
+              >
+                Clear All Filters
+              </Button>
+            </div>
+
             <CardContent className="p-0">
               <div className="overflow-x-auto">
                 <Table className="[&_th]:text-center [&_td]:text-center">
                   <TableHeader className="bg-gradient-to-r from-blue-50/50 to-cyan-50/50">
                     <TableRow className="border-b border-blue-100 hover:bg-transparent">
-                        <TableHead className="h-14 px-4 text-xs font-bold text-slate-600 uppercase tracking-wider whitespace-nowrap w-12">
-                            Select
-                        </TableHead>
+                      <TableHead className="h-14 px-4 text-xs font-bold text-slate-600 uppercase tracking-wider whitespace-nowrap w-12">
+                        <div className="flex justify-center">
+                          <Checkbox
+                            checked={
+                              filteredPendingItems.length > 0 &&
+                              selectedRows.length ===
+                                filteredPendingItems.length
+                            }
+                            onCheckedChange={handleSelectAll}
+                            aria-label="Select all rows"
+                            className="checkbox-3d border-slate-400 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 h-5 w-5 shadow-sm transition-all duration-300 ease-out"
+                          />
+                        </div>
+                      </TableHead>
                       <TableHead className="h-14 px-6 text-xs font-bold text-slate-600 uppercase tracking-wider whitespace-nowrap min-w-[150px]">
                         Action
                       </TableHead>
@@ -652,7 +815,10 @@ export default function InstallationPage() {
                   <TableBody>
                     {isLoading ? (
                       Array.from({ length: 6 }).map((_, index) => (
-                        <TableRow key={`install-skel-${index}`} className="animate-pulse">
+                        <TableRow
+                          key={`install-skel-${index}`}
+                          className="animate-pulse"
+                        >
                           {Array.from({ length: 29 }).map((__, i) => (
                             <TableCell key={i}>
                               <div className="h-4 w-full bg-slate-200 rounded mx-auto"></div>
@@ -670,7 +836,10 @@ export default function InstallationPage() {
                             <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center">
                               <Wrench className="h-6 w-6 text-slate-400" />
                             </div>
-                            <p>No pending installation requests found matching your search</p>
+                            <p>
+                              No pending installation requests found matching
+                              your search
+                            </p>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -682,9 +851,11 @@ export default function InstallationPage() {
                         >
                           <TableCell className="px-4">
                             <div className="flex justify-center">
-                              <Checkbox 
+                              <Checkbox
                                 checked={selectedRows.includes(item.serialNo)}
-                                onCheckedChange={(checked) => handleSelectRow(item.serialNo, checked)}
+                                onCheckedChange={(checked) =>
+                                  handleSelectRow(item.serialNo, checked)
+                                }
                                 aria-label={`Select row ${item.serialNo}`}
                                 className="checkbox-3d border-slate-400 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 h-5 w-5 shadow-sm transition-all duration-300 ease-out active:scale-75 hover:scale-110 data-[state=checked]:scale-110"
                               />
@@ -938,16 +1109,16 @@ export default function InstallationPage() {
               </div>
 
               <div className="flex flex-col md:flex-row items-center gap-3 w-full md:w-auto">
-                 <div className="relative w-full md:w-100">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                    <Input 
-                        placeholder="Search..." 
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-9 bg-white border-black focus-visible:ring-blue-200 h-9 transition-all hover:border-blue-200"
-                    />
-                 </div>
-                 <Badge
+                <div className="relative w-full md:w-100">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Input
+                    placeholder="Search..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-9 bg-white border-black focus-visible:ring-blue-200 h-9 transition-all hover:border-blue-200"
+                  />
+                </div>
+                <Badge
                   variant="outline"
                   className="bg-blue-100 text-blue-700 border-blue-200 px-3 py-1 h-9 flex items-center whitespace-nowrap"
                 >
@@ -955,12 +1126,64 @@ export default function InstallationPage() {
                 </Badge>
               </div>
             </CardHeader>
+
+            {/* Filter Dropdowns */}
+            <div className="px-6 py-4 bg-slate-50/50 border-b border-blue-50">
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+                {[
+                  { key: "regId", label: "Reg ID" },
+                  { key: "village", label: "Village" },
+                  { key: "block", label: "Block" },
+                  { key: "district", label: "District" },
+                  { key: "pumpSource", label: "Pump Source" },
+                  { key: "pumpType", label: "Pump Type" },
+                  { key: "company", label: "Company" },
+                ].map(({ key, label }) => (
+                  <div key={key} className="space-y-1.5">
+                    <Label className="text-xs text-slate-600">{label}</Label>
+                    <select
+                      value={filters[key]}
+                      onChange={(e) =>
+                        setFilters({ ...filters, [key]: e.target.value })
+                      }
+                      className="w-full h-9 px-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    >
+                      <option value="">All</option>
+                      {getUniqueHistoryValues(key).map((val) => (
+                        <option key={val} value={val}>
+                          {val}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setFilters({
+                    regId: "",
+                    village: "",
+                    block: "",
+                    district: "",
+                    pumpSource: "",
+                    pumpType: "",
+                    company: "",
+                  })
+                }
+                className="mt-3 text-xs"
+              >
+                Clear All Filters
+              </Button>
+            </div>
+
             <CardContent className="p-0">
               <div className="hidden md:block overflow-x-auto">
                 <Table className="[&_th]:text-center [&_td]:text-center">
                   <TableHeader className="bg-gradient-to-r from-blue-50/50 to-cyan-50/50">
                     <TableRow className="border-b border-blue-100 hover:bg-transparent">
-
                       <TableHead className="h-14 px-6 text-xs font-bold text-slate-600 uppercase tracking-wider whitespace-nowrap">
                         Reg ID
                       </TableHead>
@@ -1065,7 +1288,10 @@ export default function InstallationPage() {
                   <TableBody>
                     {isLoading ? (
                       Array.from({ length: 6 }).map((_, index) => (
-                        <TableRow key={`history-skel-${index}`} className="animate-pulse">
+                        <TableRow
+                          key={`history-skel-${index}`}
+                          className="animate-pulse"
+                        >
                           {Array.from({ length: 34 }).map((__, i) => (
                             <TableCell key={i}>
                               <div className="h-4 w-full bg-slate-200 rounded mx-auto"></div>
@@ -1083,7 +1309,11 @@ export default function InstallationPage() {
                             <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center">
                               <FileCheck className="h-6 w-6 text-slate-400" />
                             </div>
-                            <p>{historyItems.length === 0 ? "No installation history found." : "No history records found matching your search."}</p>
+                            <p>
+                              {historyItems.length === 0
+                                ? "No installation history found."
+                                : "No history records found matching your search."}
+                            </p>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -1093,7 +1323,6 @@ export default function InstallationPage() {
                           key={item.serialNo}
                           className="hover:bg-blue-50/30 transition-colors"
                         >
-
                           <TableCell className="whitespace-nowrap font-mono text-xs text-slate-500 bg-slate-50 py-1 px-2 rounded-md mx-auto w-fit">
                             {item.regId}
                           </TableCell>
@@ -1143,7 +1372,9 @@ export default function InstallationPage() {
                                   View Document
                                 </a>
                               ) : (
-                                <span className="text-slate-600 text-xs">{item.loiFileName}</span>
+                                <span className="text-slate-600 text-xs">
+                                  {item.loiFileName}
+                                </span>
                               )
                             ) : (
                               <span className="text-slate-400">-</span>
@@ -1195,7 +1426,9 @@ export default function InstallationPage() {
                                   View Challan
                                 </a>
                               ) : (
-                                <span className="text-slate-600 text-xs">{item.challanLink}</span>
+                                <span className="text-slate-600 text-xs">
+                                  {item.challanLink}
+                                </span>
                               )
                             ) : (
                               <span className="text-slate-400">-</span>
@@ -1218,9 +1451,13 @@ export default function InstallationPage() {
                           </TableCell>
                           <TableCell className="whitespace-nowrap bg-blue-50/50">
                             {item.installationChallanLink ? (
-                              item.installationChallanLink.startsWith("http") ? (
+                              item.installationChallanLink.startsWith(
+                                "http"
+                              ) ? (
                                 <a
-                                  href={getPreviewUrl(item.installationChallanLink)}
+                                  href={getPreviewUrl(
+                                    item.installationChallanLink
+                                  )}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="text-blue-600 underline text-xs flex items-center justify-center gap-1 hover:text-blue-800"
@@ -1229,20 +1466,50 @@ export default function InstallationPage() {
                                   View Challan
                                 </a>
                               ) : (
-                                <span className="text-slate-600 text-xs">{item.installationChallanLink}</span>
+                                <span className="text-slate-600 text-xs">
+                                  {item.installationChallanLink}
+                                </span>
                               )
                             ) : (
                               <span className="text-slate-400">-</span>
                             )}
                           </TableCell>
                           <TableCell className="whitespace-nowrap bg-blue-50/50 font-bold">
-                            <Badge variant="outline" className={`
-                              ${item.installationStatus === 'Completed' ? 'bg-green-100 text-green-700 border-green-200' : ''}
-                              ${item.installationStatus === 'In Progress' ? 'bg-blue-100 text-blue-700 border-blue-200' : ''}
-                              ${item.installationStatus === 'Pending' ? 'bg-yellow-100 text-yellow-700 border-yellow-200' : ''}
-                              ${item.installationStatus === 'On Hold' ? 'bg-red-100 text-red-700 border-red-200' : ''}
-                              ${!['Completed', 'In Progress', 'Pending', 'On Hold'].includes(item.installationStatus) ? 'bg-slate-100 text-slate-700 border-slate-200' : ''}
-                            `}>
+                            <Badge
+                              variant="outline"
+                              className={`
+                              ${
+                                item.installationStatus === "Completed"
+                                  ? "bg-green-100 text-green-700 border-green-200"
+                                  : ""
+                              }
+                              ${
+                                item.installationStatus === "In Progress"
+                                  ? "bg-blue-100 text-blue-700 border-blue-200"
+                                  : ""
+                              }
+                              ${
+                                item.installationStatus === "Pending"
+                                  ? "bg-yellow-100 text-yellow-700 border-yellow-200"
+                                  : ""
+                              }
+                              ${
+                                item.installationStatus === "On Hold"
+                                  ? "bg-red-100 text-red-700 border-red-200"
+                                  : ""
+                              }
+                              ${
+                                ![
+                                  "Completed",
+                                  "In Progress",
+                                  "Pending",
+                                  "On Hold",
+                                ].includes(item.installationStatus)
+                                  ? "bg-slate-100 text-slate-700 border-slate-200"
+                                  : ""
+                              }
+                            `}
+                            >
                               {item.installationStatus}
                             </Badge>
                           </TableCell>
@@ -1298,13 +1565,41 @@ export default function InstallationPage() {
                             Status
                           </span>
                           <div className="flex flex-wrap gap-1">
-                             <Badge variant="outline" className={`
-                              ${item.installationStatus === 'Completed' ? 'bg-green-100 text-green-700 border-green-200' : ''}
-                              ${item.installationStatus === 'In Progress' ? 'bg-blue-100 text-blue-700 border-blue-200' : ''}
-                              ${item.installationStatus === 'Pending' ? 'bg-yellow-100 text-yellow-700 border-yellow-200' : ''}
-                              ${item.installationStatus === 'On Hold' ? 'bg-red-100 text-red-700 border-red-200' : ''}
-                              ${!['Completed', 'In Progress', 'Pending', 'On Hold'].includes(item.installationStatus) ? 'bg-slate-100 text-slate-700 border-slate-200' : ''}
-                            `}>
+                            <Badge
+                              variant="outline"
+                              className={`
+                              ${
+                                item.installationStatus === "Completed"
+                                  ? "bg-green-100 text-green-700 border-green-200"
+                                  : ""
+                              }
+                              ${
+                                item.installationStatus === "In Progress"
+                                  ? "bg-blue-100 text-blue-700 border-blue-200"
+                                  : ""
+                              }
+                              ${
+                                item.installationStatus === "Pending"
+                                  ? "bg-yellow-100 text-yellow-700 border-yellow-200"
+                                  : ""
+                              }
+                              ${
+                                item.installationStatus === "On Hold"
+                                  ? "bg-red-100 text-red-700 border-red-200"
+                                  : ""
+                              }
+                              ${
+                                ![
+                                  "Completed",
+                                  "In Progress",
+                                  "Pending",
+                                  "On Hold",
+                                ].includes(item.installationStatus)
+                                  ? "bg-slate-100 text-slate-700 border-slate-200"
+                                  : ""
+                              }
+                            `}
+                            >
                               {item.installationStatus}
                             </Badge>
                           </div>
@@ -1360,284 +1655,306 @@ export default function InstallationPage() {
 
       {/* INSTALLATION DIALOG */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent showCloseButton={!isSuccess} className={`max-w-4xl max-h-[90vh] overflow-y-auto p-0 gap-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] ${isSuccess ? "bg-transparent !shadow-none !border-none" : ""}`}>
-        {isSuccess ? (
+        <DialogContent
+          showCloseButton={!isSuccess}
+          className={`max-w-4xl max-h-[90vh] overflow-y-auto p-0 gap-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] ${
+            isSuccess ? "bg-transparent !shadow-none !border-none" : ""
+          }`}
+        >
+          {isSuccess ? (
             <div className="flex flex-col items-center justify-center w-full p-8 text-center space-y-6 animate-in fade-in duration-300">
-                <div className="rounded-full bg-white p-5 shadow-2xl shadow-white/20 ring-8 ring-white/10 animate-in zoom-in duration-500 ease-out">
-                    <CheckCircle2 className="h-16 w-16 text-green-600 scale-110" />
-                </div>
-                <h2 className="text-3xl font-bold text-white drop-shadow-md animate-in slide-in-from-bottom-4 fade-in duration-500 delay-150 ease-out tracking-wide">
-                    Installed Successfully!
-                </h2>
+              <div className="rounded-full bg-white p-5 shadow-2xl shadow-white/20 ring-8 ring-white/10 animate-in zoom-in duration-500 ease-out">
+                <CheckCircle2 className="h-16 w-16 text-green-600 scale-110" />
+              </div>
+              <h2 className="text-3xl font-bold text-white drop-shadow-md animate-in slide-in-from-bottom-4 fade-in duration-500 delay-150 ease-out tracking-wide">
+                Installed Successfully!
+              </h2>
             </div>
-        ) : (
+          ) : (
             <>
-          <DialogHeader className="p-6 pb-2 border-b border-blue-100 bg-blue-50/30">
-            <DialogTitle className="text-xl font-bold bg-linear-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent flex items-center gap-2">
-              <span className="bg-blue-100 p-1.5 rounded-md">
-                <Wrench className="h-4 w-4 text-blue-600" />
-              </span>
-              Process Installation Work
-            </DialogTitle>
-            <DialogDescription className="text-slate-500 ml-10">
-              {isBulk ? (
-                  <span>Applying changes to <span className="font-bold text-blue-700">{selectedRows.length} selected items</span>. All fields below will be updated for these items.</span>
-              ) : (
-                  <span>Update installation details for <span className="font-semibold text-slate-700">{selectedItem?.beneficiaryName}</span> <span className="font-mono text-xs bg-slate-100 px-1 py-0.5 rounded text-slate-600 border border-slate-200">{selectedItem?.serialNo}</span></span>
-              )}
-            </DialogDescription>
-          </DialogHeader>
+              <DialogHeader className="p-6 pb-2 border-b border-blue-100 bg-blue-50/30">
+                <DialogTitle className="text-xl font-bold bg-linear-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent flex items-center gap-2">
+                  <span className="bg-blue-100 p-1.5 rounded-md">
+                    <Wrench className="h-4 w-4 text-blue-600" />
+                  </span>
+                  Process Installation Work
+                </DialogTitle>
+                <DialogDescription className="text-slate-500 ml-10">
+                  {isBulk ? (
+                    <span>
+                      Applying changes to{" "}
+                      <span className="font-bold text-blue-700">
+                        {selectedRows.length} selected items
+                      </span>
+                      . All fields below will be updated for these items.
+                    </span>
+                  ) : (
+                    <span>
+                      Update installation details for{" "}
+                      <span className="font-semibold text-slate-700">
+                        {selectedItem?.beneficiaryName}
+                      </span>{" "}
+                      <span className="font-mono text-xs bg-slate-100 px-1 py-0.5 rounded text-slate-600 border border-slate-200">
+                        {selectedItem?.serialNo}
+                      </span>
+                    </span>
+                  )}
+                </DialogDescription>
+              </DialogHeader>
 
-          <div className="p-6 space-y-6">
-            {(selectedItem || isBulk) && (
-              <>
-                {/* PREFILLED BENEFICIARY DETAILS CARD - Hide in Bulk Mode */}
-                {!isBulk && selectedItem && (
-                <div className="bg-slate-50/50 rounded-xl border border-slate-200 p-4">
-                  <h3 className="text-sm font-semibold text-slate-800 mb-3 flex items-center gap-2">
-                    <FileCheck className="h-4 w-4 text-blue-600" />
-                    Beneficiary Details
-                  </h3>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-y-4 gap-x-8 text-sm">
-                    <div>
-                      <span className="text-slate-500 text-xs block mb-1">
-                        Serial No
-                      </span>
-                      <p className="font-medium text-slate-800">
-                        {selectedItem.serialNo}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 text-xs block mb-1">
-                        Reg ID
-                      </span>
-                      <p className="font-medium text-slate-800 font-mono">
-                        {selectedItem.regId}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 text-xs block mb-1">
-                        Beneficiary Name
-                      </span>
-                      <p className="font-medium text-slate-800">
-                        {selectedItem.beneficiaryName}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 text-xs block mb-1">
-                        Father's Name
-                      </span>
-                      <p className="font-medium text-slate-800">
-                        {selectedItem.fatherName}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 text-xs block mb-1">
-                        Village/Block
-                      </span>
-                      <p className="font-medium text-slate-800">
-                        {selectedItem.village}, {selectedItem.block}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 text-xs block mb-1">
-                        Pump Type
-                      </span>
-                      <p className="font-medium text-blue-700 bg-blue-50 inline-block px-2 py-0.5 rounded text-xs border border-blue-100">
-                        {selectedItem.pumpType}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                )}
-
-                {/* INSTALLATION INPUT FORM */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium text-slate-700">
-                      Installation Material Ageing
-                    </Label>
-                    <Input
-                      value={formData.installationMaterialAgeing}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          installationMaterialAgeing: e.target.value,
-                        })
-                      }
-                      placeholder="e.g. 30 days"
-                      className="h-10 border-slate-200 focus:border-cyan-400 focus-visible:ring-cyan-100 transition-all"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium text-slate-700">
-                      Installation Material Receiving Date
-                    </Label>
-                    <Input
-                      type="date"
-                      value={formData.installationMaterialReceivingDate}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          installationMaterialReceivingDate: e.target.value,
-                        })
-                      }
-                      className="h-10 border-slate-200 focus:border-cyan-400 focus-visible:ring-cyan-100 transition-all"
-                    />
-                  </div>
-
-                  <div className="space-y-2 md:col-span-2">
-                    <Label className="text-sm font-medium text-slate-700">
-                      Challan Link
-                    </Label>
-                    <div
-                      className="border-2 border-dashed border-slate-200 rounded-xl p-4 bg-slate-50/50 flex flex-col items-center justify-center gap-2 hover:bg-slate-50 transition-colors cursor-pointer group"
-                      onClick={() =>
-                        document
-                          .getElementById("installation-challan-file")
-                          ?.click()
-                      }
-                    >
-                      <Input
-                        type="file"
-                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                        onChange={handleFileUpload}
-                        className="hidden"
-                        id="installation-challan-file"
-                      />
-                      <div className="p-3 bg-white rounded-full shadow-sm group-hover:scale-110 transition-transform">
-                        <Upload className="h-5 w-5 text-cyan-600" />
+              <div className="p-6 space-y-6">
+                {(selectedItem || isBulk) && (
+                  <>
+                    {/* PREFILLED BENEFICIARY DETAILS CARD - Hide in Bulk Mode */}
+                    {!isBulk && selectedItem && (
+                      <div className="bg-slate-50/50 rounded-xl border border-slate-200 p-4">
+                        <h3 className="text-sm font-semibold text-slate-800 mb-3 flex items-center gap-2">
+                          <FileCheck className="h-4 w-4 text-blue-600" />
+                          Beneficiary Details
+                        </h3>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-y-4 gap-x-8 text-sm">
+                          <div>
+                            <span className="text-slate-500 text-xs block mb-1">
+                              Serial No
+                            </span>
+                            <p className="font-medium text-slate-800">
+                              {selectedItem.serialNo}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="text-slate-500 text-xs block mb-1">
+                              Reg ID
+                            </span>
+                            <p className="font-medium text-slate-800 font-mono">
+                              {selectedItem.regId}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="text-slate-500 text-xs block mb-1">
+                              Beneficiary Name
+                            </span>
+                            <p className="font-medium text-slate-800">
+                              {selectedItem.beneficiaryName}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="text-slate-500 text-xs block mb-1">
+                              Father's Name
+                            </span>
+                            <p className="font-medium text-slate-800">
+                              {selectedItem.fatherName}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="text-slate-500 text-xs block mb-1">
+                              Village/Block
+                            </span>
+                            <p className="font-medium text-slate-800">
+                              {selectedItem.village}, {selectedItem.block}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="text-slate-500 text-xs block mb-1">
+                              Pump Type
+                            </span>
+                            <p className="font-medium text-blue-700 bg-blue-50 inline-block px-2 py-0.5 rounded text-xs border border-blue-100">
+                              {selectedItem.pumpType}
+                            </p>
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-center">
-                        <span className="text-sm font-medium text-slate-700 group-hover:text-cyan-700 transition-colors">
-                          {formData.installationChallanLink
-                            ? "Change Challan Document"
-                            : "Upload Challan Document"}
-                        </span>
-                        <p className="text-xs text-slate-400 mt-1">
-                          SVG, PNG, JPG or PDF (max. 10MB)
-                        </p>
-                      </div>
-                      {formData.installationChallanLink && (
-                        <Badge
-                          variant="secondary"
-                          className="mt-2 bg-cyan-50 text-cyan-700 border-cyan-200"
-                        >
-                          <FileCheck className="h-3 w-3 mr-1" />
-                          {formData.installationChallanLink}
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium text-slate-700">
-                      Installation Status
-                    </Label>
-                    <Select
-                      value={formData.installationStatus}
-                      onValueChange={(value) =>
-                        setFormData({ ...formData, installationStatus: value })
-                      }
-                    >
-                      <SelectTrigger className="h-10 border-slate-200 focus:border-cyan-400 focus:ring-cyan-100">
-                        <SelectValue placeholder="Select status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem
-                          value="Completed"
-                          className="text-green-600 font-medium focus:bg-green-50 focus:text-green-700 cursor-pointer"
-                        >
-                          Completed
-                        </SelectItem>
-                        <SelectItem
-                          value="In Progress"
-                          className="text-blue-600 font-medium focus:bg-blue-50 focus:text-blue-700 cursor-pointer"
-                        >
-                          In Progress
-                        </SelectItem>
-                        <SelectItem
-                          value="Pending"
-                          className="text-yellow-600 font-medium focus:bg-yellow-50 focus:text-yellow-700 cursor-pointer"
-                        >
-                          Pending
-                        </SelectItem>
-                        <SelectItem
-                          value="On Hold"
-                          className="text-red-600 font-medium focus:bg-red-50 focus:text-red-700 cursor-pointer"
-                        >
-                          On Hold
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium text-slate-700">
-                      Installation Completion Date
-                    </Label>
-                    <Input
-                      type="date"
-                      value={formData.installationCompletionDate}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          installationCompletionDate: e.target.value,
-                        })
-                      }
-                      className="h-10 border-slate-200 focus:border-cyan-400 focus-visible:ring-cyan-100 transition-all"
-                    />
-                  </div>
-
-                  <div className="space-y-2 md:col-span-2">
-                    <Label className="text-sm font-medium text-slate-700">
-                      Ins Photo OK Date
-                    </Label>
-                    <Input
-                      type="date"
-                      value={formData.insPhotoOkDate}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          insPhotoOkDate: e.target.value,
-                        })
-                      }
-                      className="h-10 border-slate-200 focus:border-cyan-400 focus-visible:ring-cyan-100 transition-all"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 pb-6 pr-6">
-                  <Button
-                    variant="ghost"
-                    onClick={() => setIsDialogOpen(false)}
-                    disabled={isSubmitting}
-                    className="h-10 px-6 text-slate-600 hover:text-slate-800 hover:bg-slate-100/50"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={handleSubmit}
-                    disabled={isSubmitting}
-                    className="h-10 px-6 bg-linear-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white shadow-md transition-all hover:shadow-lg min-w-[150px]"
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Installing...
-                      </>
-                    ) : (
-                      "Complete Installation"
                     )}
-                  </Button>
-                </div>
-              </>
-            )}
-          </div>
-        </>
-      )}
-      </DialogContent>
+
+                    {/* INSTALLATION INPUT FORM */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium text-slate-700">
+                          Installation Material Ageing
+                        </Label>
+                        <Input
+                          value={formData.installationMaterialAgeing}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              installationMaterialAgeing: e.target.value,
+                            })
+                          }
+                          placeholder="e.g. 30 days"
+                          className="h-10 border-slate-200 focus:border-cyan-400 focus-visible:ring-cyan-100 transition-all"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium text-slate-700">
+                          Installation Material Receiving Date
+                        </Label>
+                        <Input
+                          type="date"
+                          value={formData.installationMaterialReceivingDate}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              installationMaterialReceivingDate: e.target.value,
+                            })
+                          }
+                          className="h-10 border-slate-200 focus:border-cyan-400 focus-visible:ring-cyan-100 transition-all"
+                        />
+                      </div>
+
+                      <div className="space-y-2 md:col-span-2">
+                        <Label className="text-sm font-medium text-slate-700">
+                          Challan Link
+                        </Label>
+                        <div
+                          className="border-2 border-dashed border-slate-200 rounded-xl p-4 bg-slate-50/50 flex flex-col items-center justify-center gap-2 hover:bg-slate-50 transition-colors cursor-pointer group"
+                          onClick={() =>
+                            document
+                              .getElementById("installation-challan-file")
+                              ?.click()
+                          }
+                        >
+                          <Input
+                            type="file"
+                            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                            onChange={handleFileUpload}
+                            className="hidden"
+                            id="installation-challan-file"
+                          />
+                          <div className="p-3 bg-white rounded-full shadow-sm group-hover:scale-110 transition-transform">
+                            <Upload className="h-5 w-5 text-cyan-600" />
+                          </div>
+                          <div className="text-center">
+                            <span className="text-sm font-medium text-slate-700 group-hover:text-cyan-700 transition-colors">
+                              {formData.installationChallanLink
+                                ? "Change Challan Document"
+                                : "Upload Challan Document"}
+                            </span>
+                            <p className="text-xs text-slate-400 mt-1">
+                              SVG, PNG, JPG or PDF (max. 10MB)
+                            </p>
+                          </div>
+                          {formData.installationChallanLink && (
+                            <Badge
+                              variant="secondary"
+                              className="mt-2 bg-cyan-50 text-cyan-700 border-cyan-200"
+                            >
+                              <FileCheck className="h-3 w-3 mr-1" />
+                              {formData.installationChallanLink}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium text-slate-700">
+                          Installation Status
+                        </Label>
+                        <Select
+                          value={formData.installationStatus}
+                          onValueChange={(value) =>
+                            setFormData({
+                              ...formData,
+                              installationStatus: value,
+                            })
+                          }
+                        >
+                          <SelectTrigger className="h-10 border-slate-200 focus:border-cyan-400 focus:ring-cyan-100">
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem
+                              value="Completed"
+                              className="text-green-600 font-medium focus:bg-green-50 focus:text-green-700 cursor-pointer"
+                            >
+                              Completed
+                            </SelectItem>
+                            <SelectItem
+                              value="In Progress"
+                              className="text-blue-600 font-medium focus:bg-blue-50 focus:text-blue-700 cursor-pointer"
+                            >
+                              In Progress
+                            </SelectItem>
+                            <SelectItem
+                              value="Pending"
+                              className="text-yellow-600 font-medium focus:bg-yellow-50 focus:text-yellow-700 cursor-pointer"
+                            >
+                              Pending
+                            </SelectItem>
+                            <SelectItem
+                              value="On Hold"
+                              className="text-red-600 font-medium focus:bg-red-50 focus:text-red-700 cursor-pointer"
+                            >
+                              On Hold
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium text-slate-700">
+                          Installation Completion Date
+                        </Label>
+                        <Input
+                          type="date"
+                          value={formData.installationCompletionDate}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              installationCompletionDate: e.target.value,
+                            })
+                          }
+                          className="h-10 border-slate-200 focus:border-cyan-400 focus-visible:ring-cyan-100 transition-all"
+                        />
+                      </div>
+
+                      <div className="space-y-2 md:col-span-2">
+                        <Label className="text-sm font-medium text-slate-700">
+                          Ins Photo OK Date
+                        </Label>
+                        <Input
+                          type="date"
+                          value={formData.insPhotoOkDate}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              insPhotoOkDate: e.target.value,
+                            })
+                          }
+                          className="h-10 border-slate-200 focus:border-cyan-400 focus-visible:ring-cyan-100 transition-all"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 pb-6 pr-6">
+                      <Button
+                        variant="ghost"
+                        onClick={() => setIsDialogOpen(false)}
+                        disabled={isSubmitting}
+                        className="h-10 px-6 text-slate-600 hover:text-slate-800 hover:bg-slate-100/50"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={handleSubmit}
+                        disabled={isSubmitting}
+                        className="h-10 px-6 bg-linear-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white shadow-md transition-all hover:shadow-lg min-w-[150px]"
+                      >
+                        {isSubmitting ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Installing...
+                          </>
+                        ) : (
+                          "Complete Installation"
+                        )}
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </>
+          )}
+        </DialogContent>
       </Dialog>
     </div>
   );

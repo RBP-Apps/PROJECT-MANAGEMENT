@@ -1,453 +1,739 @@
 import { useState, useEffect } from "react";
-import { Card, CardContent, } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Search, Users, MapPin, Home } from "lucide-react";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 export default function PortalPage() {
-    const [open, setOpen] = useState(false);
-    const [history, setHistory] = useState([]);
-    const [isLoaded, setIsLoaded] = useState(false);
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState(null);
+  const [open, setOpen] = useState(false);
+  const [history, setHistory] = useState([]);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-    const fetchData = async () => {
-        setIsLoading(true);
-        setError(null);
-        try {
-            const scriptUrl = import.meta.env.VITE_APP_SCRIPT_URL;
-            const sheetId = import.meta.env.VITE_SHEET_ID;
+  const [filters, setFilters] = useState({
+    regId: "",
+    village: "",
+    block: "",
+    district: "",
+    pumpSource: "",
+    pumpType: "",
+    company: "",
+  });
 
-            if (!scriptUrl || !sheetId) {
-                throw new Error("Configuration missing: Check .env for Script URL and Sheet ID");
-            }
+  const getUniqueValues = (field) => {
+    const values = history
+      .map((item) => item[field])
+      .filter((v) => v && v !== "-");
+    return [...new Set(values)].sort();
+  };
 
-            // Using both 'sheet' and 'sheetName' parameters for compatibility consistency
-            const params = new URLSearchParams({
-                action: 'read',
-                sheet: 'Project Main', 
-                sheetName: 'Project Main',
-                id: sheetId.trim()
-            });
+  const fetchData = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const scriptUrl = import.meta.env.VITE_APP_SCRIPT_URL;
+      const sheetId = import.meta.env.VITE_SHEET_ID;
 
-            const response = await fetch(`${scriptUrl}?${params.toString()}`);
-            if (!response.ok) {
-                throw new Error("Network response was not ok");
-            }
+      if (!scriptUrl || !sheetId) {
+        throw new Error(
+          "Configuration missing: Check .env for Script URL and Sheet ID"
+        );
+      }
 
-            const result = await response.json();
-            
-            // Handle App Script response wrapper
-            if (result.success === false) {
-                 throw new Error(result.error || "Sheet API returned an error");
-            }
+      // Using both 'sheet' and 'sheetName' parameters for compatibility consistency
+      const params = new URLSearchParams({
+        action: "read",
+        sheet: "Project Main",
+        sheetName: "Project Main",
+        id: sheetId.trim(),
+      });
 
-            const rawRows = Array.isArray(result) ? result : (result.data || []);
-            console.log("Raw Rows received:", rawRows); // Debug log for user
+      const response = await fetch(`${scriptUrl}?${params.toString()}`);
+      if (!response.ok) {
+        throw new Error("Network response was not ok");
+      }
 
-            if (rawRows.length === 0) {
-                setHistory([]);
-                return;
-            }
+      const result = await response.json();
 
-            // Robust Header Detection: Look for specific columns in the first 10 rows
-            let headerRowIndex = -1;
-            const targetColumns = ["regid", "beneficiaryname", "village"]; // Key columns to identify header row
+      // Handle App Script response wrapper
+      if (result.success === false) {
+        throw new Error(result.error || "Sheet API returned an error");
+      }
 
-            for(let i=0; i < Math.min(rawRows.length, 10); i++) {
-                const row = rawRows[i];
-                if (!Array.isArray(row)) continue;
-                
-                // Check if this row contains our target columns
-                const normalizedRow = row.map(c => String(c).toLowerCase().replace(/\s+/g, ''));
-                const matchCount = targetColumns.filter(col => normalizedRow.includes(col)).length;
-                
-                if (matchCount >= 2) { // logic: if at least 2 key columns are found, it's the header
-                    headerRowIndex = i;
-                    console.log("Header row found at index:", i);
-                    break;
-                }
-            }
+      const rawRows = Array.isArray(result) ? result : result.data || [];
+      console.log("Raw Rows received:", rawRows); // Debug log for user
 
-            // Fallback: If not found, assume Row 6 (Index 5) as per screenshot
-            if (headerRowIndex === -1 && rawRows.length > 5) {
-                console.warn("Could not auto-detect header row. Falling back to Index 5 (Row 6).");
-                headerRowIndex = 5;
-            } else if (headerRowIndex === -1) {
-                 throw new Error("Could not identify header row in Sheet");
-            }
+      if (rawRows.length === 0) {
+        setHistory([]);
+        return;
+      }
 
-            const headers = rawRows[headerRowIndex].map(h => String(h).trim().toLowerCase());
-            console.log("Headers used:", headers);
+      // Robust Header Detection: Look for specific columns in the first 10 rows
+      let headerRowIndex = -1;
+      const targetColumns = ["regid", "beneficiaryname", "village"]; // Key columns to identify header row
 
-            // Helper to fuzzy find column index
-            // We search for key words like 'reg' and 'id' for 'Reg ID'
-            const findCol = (keywords) => {
-                 return headers.findIndex(h => keywords.every(k => h.includes(k)));
-            }
+      for (let i = 0; i < Math.min(rawRows.length, 10); i++) {
+        const row = rawRows[i];
+        if (!Array.isArray(row)) continue;
 
-            const colMap = {
-                serialNo: findCol(['serial']),
-                regId: findCol(['reg', 'id']),
-                beneficiaryName: findCol(['beneficiary', 'name']),
-                fatherName: findCol(['father']),
-                village: findCol(['village']),
-                block: findCol(['block']),
-                district: findCol(['district']),
-                category: findCol(['category']),
-                pumpSource: findCol(['pump', 'source']),
-                pumpType: findCol(['pump', 'type']),
-                company: findCol(['company'])
-            };
+        // Check if this row contains our target columns
+        const normalizedRow = row.map((c) =>
+          String(c).toLowerCase().replace(/\s+/g, "")
+        );
+        const matchCount = targetColumns.filter((col) =>
+          normalizedRow.includes(col)
+        ).length;
 
-            console.log("Column Mapping:", colMap);
-
-            const parsedData = [];
-            
-            // Iterate data rows (skip headers)
-            for (let i = headerRowIndex + 1; i < rawRows.length; i++) {
-                const row = rawRows[i];
-                if (!row || row.length === 0) continue;
-
-                // Basic validation: ensure we have data at the Reg ID index
-                if (colMap.regId === -1 || !row[colMap.regId]) continue;
-
-                parsedData.push({
-                    serialNo: row[colMap.serialNo] || "-",
-                    regId: row[colMap.regId] || "-",
-                    beneficiaryName: row[colMap.beneficiaryName] || "-",
-                    fatherName: row[colMap.fatherName] || "-",
-                    village: row[colMap.village] || "-",
-                    block: row[colMap.block] || "-",
-                    district: row[colMap.district] || "-",
-                    category: row[colMap.category] || "-",
-                    pumpSource: row[colMap.pumpSource] || "-",
-                    pumpType: row[colMap.pumpType] || "-",
-                    company: row[colMap.company] || "-"
-                });
-            }
-
-            console.log("Parsed Data:", parsedData);
-            setHistory(parsedData);
-            setIsLoaded(true);
-
-        } catch (err) {
-            console.error("Fetch Error:", err);
-            setError(err.message);
-        } finally {
-            setIsLoading(false);
+        if (matchCount >= 2) {
+          // logic: if at least 2 key columns are found, it's the header
+          headerRowIndex = i;
+          console.log("Header row found at index:", i);
+          break;
         }
-    };
+      }
 
-    useEffect(() => {
-        fetchData();
-    }, []);
+      // Fallback: If not found, assume Row 6 (Index 5) as per screenshot
+      if (headerRowIndex === -1 && rawRows.length > 5) {
+        console.warn(
+          "Could not auto-detect header row. Falling back to Index 5 (Row 6)."
+        );
+        headerRowIndex = 5;
+      } else if (headerRowIndex === -1) {
+        throw new Error("Could not identify header row in Sheet");
+      }
 
-    // (Removed localStorage save logic as we are now syncing from Sheet)
+      const headers = rawRows[headerRowIndex].map((h) =>
+        String(h).trim().toLowerCase()
+      );
+      console.log("Headers used:", headers);
 
-    const [searchTerm, setSearchTerm] = useState("");
+      // Helper to fuzzy find column index
+      // We search for key words like 'reg' and 'id' for 'Reg ID'
+      const findCol = (keywords) => {
+        return headers.findIndex((h) => keywords.every((k) => h.includes(k)));
+      };
 
-    const filteredHistory = history.filter((item) =>
-      Object.values(item).some((value) =>
-        value.toString().toLowerCase().includes(searchTerm.toLowerCase())
-      )
+      const colMap = {
+        serialNo: findCol(["serial"]),
+        regId: findCol(["reg", "id"]),
+        beneficiaryName: findCol(["beneficiary", "name"]),
+        fatherName: findCol(["father"]),
+        village: findCol(["village"]),
+        block: findCol(["block"]),
+        district: findCol(["district"]),
+        category: findCol(["category"]),
+        pumpSource: findCol(["pump", "source"]),
+        pumpType: findCol(["pump", "type"]),
+        company: findCol(["company"]),
+      };
+
+      console.log("Column Mapping:", colMap);
+
+      const parsedData = [];
+
+      // Iterate data rows (skip headers)
+      for (let i = headerRowIndex + 1; i < rawRows.length; i++) {
+        const row = rawRows[i];
+        if (!row || row.length === 0) continue;
+
+        // Basic validation: ensure we have data at the Reg ID index
+        if (colMap.regId === -1 || !row[colMap.regId]) continue;
+
+        parsedData.push({
+          serialNo: row[colMap.serialNo] || "-",
+          regId: row[colMap.regId] || "-",
+          beneficiaryName: row[colMap.beneficiaryName] || "-",
+          fatherName: row[colMap.fatherName] || "-",
+          village: row[colMap.village] || "-",
+          block: row[colMap.block] || "-",
+          district: row[colMap.district] || "-",
+          category: row[colMap.category] || "-",
+          pumpSource: row[colMap.pumpSource] || "-",
+          pumpType: row[colMap.pumpType] || "-",
+          company: row[colMap.company] || "-",
+        });
+      }
+
+      console.log("Parsed Data:", parsedData);
+      setHistory(parsedData);
+      setIsLoaded(true);
+    } catch (err) {
+      console.error("Fetch Error:", err);
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  // (Removed localStorage save logic as we are now syncing from Sheet)
+
+  const [searchTerm, setSearchTerm] = useState("");
+
+  // const filteredHistory = history.filter((item) =>
+  //   Object.values(item).some((value) =>
+  //     value.toString().toLowerCase().includes(searchTerm.toLowerCase())
+  //   )
+  // );
+
+  const filteredHistory = history.filter((item) => {
+    // Search term filter
+    const matchesSearch = Object.values(item).some((value) =>
+      value.toString().toLowerCase().includes(searchTerm.toLowerCase())
     );
-    const [formData, setFormData] = useState({
-        regId: "",
-        beneficiaryName: "",
-        fatherName: "",
-        village: "",
-        block: "",
-        district: "",
-        category: "",
-        pumpSource: "",
-        pumpType: "",
-        company: "",
-    });
-    const generateSerialNo = () => {
-        // Simple auto-increment based on history length + timestamp for uniqueness
-        const timestamp = Date.now().toString().slice(-6);
-        const count = history.length + 1;
-        return `SR${count.toString().padStart(4, "0")}-${timestamp}`;
-    };
-    const handleInputChange = (e) => {
-        setFormData({
-            ...formData,
-            [e.target.name]: e.target.value,
-        });
-    };
-    const handleSubmit = () => {
-        const newEntry = {
-            ...formData,
-            serialNo: generateSerialNo(),
-        };
-        setHistory([newEntry, ...history]); // Add to top
-        setOpen(false);
-        // Reset form
-        setFormData({
-            regId: "",
-            beneficiaryName: "",
-            fatherName: "",
-            village: "",
-            block: "",
-            district: "",
-            category: "",
-            pumpSource: "",
-            pumpType: "",
-            company: "",
-        });
-    };
-    // Calculate quick stats
-    const stats = {
-        total: history.length,
-        districts: new Set(history.map(i => i.district).filter(d => d !== "-")).size,
-        villages: new Set(history.map(i => i.village).filter(v => v !== "-")).size,
-    };
 
-    return (
+    // Dropdown filters
+    const matchesFilters =
+      (!filters.regId || item.regId === filters.regId) &&
+      (!filters.village || item.village === filters.village) &&
+      (!filters.block || item.block === filters.block) &&
+      (!filters.district || item.district === filters.district) &&
+      (!filters.pumpSource || item.pumpSource === filters.pumpSource) &&
+      (!filters.pumpType || item.pumpType === filters.pumpType) &&
+      (!filters.company || item.company === filters.company);
+
+    return matchesSearch && matchesFilters;
+  });
+
+  const [formData, setFormData] = useState({
+    regId: "",
+    beneficiaryName: "",
+    fatherName: "",
+    village: "",
+    block: "",
+    district: "",
+    category: "",
+    pumpSource: "",
+    pumpType: "",
+    company: "",
+  });
+  const generateSerialNo = () => {
+    // Simple auto-increment based on history length + timestamp for uniqueness
+    const timestamp = Date.now().toString().slice(-6);
+    const count = history.length + 1;
+    return `SR${count.toString().padStart(4, "0")}-${timestamp}`;
+  };
+  const handleInputChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value,
+    });
+  };
+  const handleSubmit = () => {
+    const newEntry = {
+      ...formData,
+      serialNo: generateSerialNo(),
+    };
+    setHistory([newEntry, ...history]); // Add to top
+    setOpen(false);
+    // Reset form
+    setFormData({
+      regId: "",
+      beneficiaryName: "",
+      fatherName: "",
+      village: "",
+      block: "",
+      district: "",
+      category: "",
+      pumpSource: "",
+      pumpType: "",
+      company: "",
+    });
+  };
+  // Calculate quick stats
+  const stats = {
+    total: history.length,
+    districts: new Set(history.map((i) => i.district).filter((d) => d !== "-"))
+      .size,
+    villages: new Set(history.map((i) => i.village).filter((v) => v !== "-"))
+      .size,
+  };
+
+  return (
     <div className="space-y-6 px-4 pt-2 pb-4 md:px-8 md:pt-4 md:pb-8 max-w-[1600px] mx-auto animate-fade-in-up min-h-screen bg-slate-50/50">
-      
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-           <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-700 to-cyan-600 bg-clip-text text-transparent">
-             Registration Portal
-           </h1>
-           <p className="text-slate-500 text-sm mt-1">
-             Centralized beneficiary registry and project data.
-           </p>
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-700 to-cyan-600 bg-clip-text text-transparent">
+            Registration Portal
+          </h1>
+          <p className="text-slate-500 text-sm mt-1">
+            Centralized beneficiary registry and project data.
+          </p>
         </div>
-        
+
         {/* Search Bar */}
         <div className="relative w-full md:w-72">
-             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-             <Input 
-                placeholder="Search beneficiaries, IDs..." 
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 bg-white border-slate-200 focus-visible:ring-blue-500 transition-all hover:border-blue-300"
-             />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Input
+            placeholder="Search beneficiaries, IDs..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9 bg-white border-slate-200 focus-visible:ring-blue-500 transition-all hover:border-blue-300"
+          />
         </div>
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="bg-white/80 backdrop-blur border-blue-100 shadow-sm hover:shadow-md transition-all">
-              <CardContent className="p-4 flex items-center justify-between">
-                  <div>
-                      <p className="text-xs font-medium text-slate-500 uppercase">Total Beneficiaries</p>
-                      <h3 className="text-2xl font-bold text-slate-800">{stats.total}</h3>
-                  </div>
-                  <div className="h-10 w-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
-                      <Users className="h-5 w-5" />
-                  </div>
-              </CardContent>
-          </Card>
-          <Card className="bg-white/80 backdrop-blur border-purple-100 shadow-sm hover:shadow-md transition-all">
-              <CardContent className="p-4 flex items-center justify-between">
-                  <div>
-                      <p className="text-xs font-medium text-slate-500 uppercase">Districts Covered</p>
-                      <h3 className="text-2xl font-bold text-slate-800">{stats.districts}</h3>
-                  </div>
-                  <div className="h-10 w-10 rounded-full bg-purple-50 flex items-center justify-center text-purple-600">
-                      <MapPin className="h-5 w-5" />
-                  </div>
-              </CardContent>
-          </Card>
-          <Card className="bg-white/80 backdrop-blur border-emerald-100 shadow-sm hover:shadow-md transition-all">
-              <CardContent className="p-4 flex items-center justify-between">
-                  <div>
-                      <p className="text-xs font-medium text-slate-500 uppercase">Villages Reach</p>
-                      <h3 className="text-2xl font-bold text-slate-800">{stats.villages}</h3>
-                  </div>
-                  <div className="h-10 w-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600">
-                      <Home className="h-5 w-5" />
-                  </div>
-              </CardContent>
-          </Card>
+        <Card className="bg-white/80 backdrop-blur border-blue-100 shadow-sm hover:shadow-md transition-all">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-medium text-slate-500 uppercase">
+                Total Beneficiaries
+              </p>
+              <h3 className="text-2xl font-bold text-slate-800">
+                {stats.total}
+              </h3>
+            </div>
+            <div className="h-10 w-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
+              <Users className="h-5 w-5" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-white/80 backdrop-blur border-purple-100 shadow-sm hover:shadow-md transition-all">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-medium text-slate-500 uppercase">
+                Districts Covered
+              </p>
+              <h3 className="text-2xl font-bold text-slate-800">
+                {stats.districts}
+              </h3>
+            </div>
+            <div className="h-10 w-10 rounded-full bg-purple-50 flex items-center justify-center text-purple-600">
+              <MapPin className="h-5 w-5" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-white/80 backdrop-blur border-emerald-100 shadow-sm hover:shadow-md transition-all">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-medium text-slate-500 uppercase">
+                Villages Reach
+              </p>
+              <h3 className="text-2xl font-bold text-slate-800">
+                {stats.villages}
+              </h3>
+            </div>
+            <div className="h-10 w-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600">
+              <Home className="h-5 w-5" />
+            </div>
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Filter Dropdowns */}
+      <Card className="bg-white border-slate-200 shadow-sm">
+        <CardContent className="p-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+            {[
+              { key: "regId", label: "Reg ID" },
+              { key: "village", label: "Village" },
+              { key: "block", label: "Block" },
+              { key: "district", label: "District" },
+              { key: "pumpSource", label: "Pump Source" },
+              { key: "pumpType", label: "Pump Type" },
+              { key: "company", label: "Company" },
+            ].map(({ key, label }) => (
+              <div key={key} className="space-y-1.5">
+                <Label className="text-xs text-slate-600">{label}</Label>
+                <select
+                  value={filters[key]}
+                  onChange={(e) =>
+                    setFilters({ ...filters, [key]: e.target.value })
+                  }
+                  className="w-full h-9 px-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                >
+                  <option value="">All</option>
+                  {getUniqueValues(key).map((val) => (
+                    <option key={val} value={val}>
+                      {val}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ))}
+          </div>
+
+          {/* Clear Filters Button */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              setFilters({
+                regId: "",
+                village: "",
+                block: "",
+                district: "",
+                pumpSource: "",
+                pumpType: "",
+                company: "",
+              })
+            }
+            className="mt-3 text-xs"
+          >
+            Clear All Filters
+          </Button>
+        </CardContent>
+      </Card>
 
       {/* Search and Add Button Removed as per request, Form preserved below */}
       <Dialog open={open} onOpenChange={setOpen}>
-          {/* Trigger removed */}
-          <DialogContent className="max-w-2xl max-h-[75vh] md:max-h-[80vh] flex flex-col p-6 overflow-visible">
-            <DialogHeader className="shrink-0">
-              <DialogTitle className="bg-linear-to-r from-cyan-500 to-blue-600 bg-clip-text text-transparent pb-1">
-                Beneficiary Registration
-              </DialogTitle>
-            </DialogHeader>
-            <div className="flex-1 overflow-y-auto pr-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="regId" className="text-sm font-medium text-slate-700">
-                    Reg ID
-                  </Label>
-                  <Input id="regId" name="regId" value={formData.regId} onChange={handleInputChange} className="h-10 text-sm focus-visible:ring-blue-100" placeholder="Enter Reg ID" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="category" className="text-sm font-medium text-slate-700">
-                    Category
-                  </Label>
-                  <Input id="category" name="category" value={formData.category} onChange={handleInputChange} className="h-10 text-sm focus-visible:ring-blue-100" placeholder="Enter Category" />
-                </div>
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="beneficiaryName" className="text-sm font-medium text-slate-700">
-                    Beneficiary Name
-                  </Label>
-                  <Input id="beneficiaryName" name="beneficiaryName" value={formData.beneficiaryName} onChange={handleInputChange} className="h-10 text-sm focus-visible:ring-blue-100" placeholder="Enter Beneficiary Name" />
-                </div>
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="fatherName" className="text-sm font-medium text-slate-700">
-                    Father's Name
-                  </Label>
-                  <Input id="fatherName" name="fatherName" value={formData.fatherName} onChange={handleInputChange} className="h-10 text-sm focus-visible:ring-blue-100" placeholder="Enter Father's Name" />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="village" className="text-sm font-medium text-slate-700">
-                    Village
-                  </Label>
-                  <Input id="village" name="village" value={formData.village} onChange={handleInputChange} className="h-10 text-sm focus-visible:ring-blue-100" placeholder="Village Name" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="block" className="text-sm font-medium text-slate-700">
-                    Block
-                  </Label>
-                  <Input id="block" name="block" value={formData.block} onChange={handleInputChange} className="h-10 text-sm focus-visible:ring-blue-100" placeholder="Block Name" />
-                </div>
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="district" className="text-sm font-medium text-slate-700">
-                    District
-                  </Label>
-                  <Input id="district" name="district" value={formData.district} onChange={handleInputChange} className="h-10 text-sm focus-visible:ring-blue-100" placeholder="District Name" />
-                </div>
+        {/* Trigger removed */}
+        <DialogContent className="max-w-2xl max-h-[75vh] md:max-h-[80vh] flex flex-col p-6 overflow-visible">
+          <DialogHeader className="shrink-0">
+            <DialogTitle className="bg-linear-to-r from-cyan-500 to-blue-600 bg-clip-text text-transparent pb-1">
+              Beneficiary Registration
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto pr-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5 py-4">
+              <div className="space-y-2">
+                <Label
+                  htmlFor="regId"
+                  className="text-sm font-medium text-slate-700"
+                >
+                  Reg ID
+                </Label>
+                <Input
+                  id="regId"
+                  name="regId"
+                  value={formData.regId}
+                  onChange={handleInputChange}
+                  className="h-10 text-sm focus-visible:ring-blue-100"
+                  placeholder="Enter Reg ID"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label
+                  htmlFor="category"
+                  className="text-sm font-medium text-slate-700"
+                >
+                  Category
+                </Label>
+                <Input
+                  id="category"
+                  name="category"
+                  value={formData.category}
+                  onChange={handleInputChange}
+                  className="h-10 text-sm focus-visible:ring-blue-100"
+                  placeholder="Enter Category"
+                />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label
+                  htmlFor="beneficiaryName"
+                  className="text-sm font-medium text-slate-700"
+                >
+                  Beneficiary Name
+                </Label>
+                <Input
+                  id="beneficiaryName"
+                  name="beneficiaryName"
+                  value={formData.beneficiaryName}
+                  onChange={handleInputChange}
+                  className="h-10 text-sm focus-visible:ring-blue-100"
+                  placeholder="Enter Beneficiary Name"
+                />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label
+                  htmlFor="fatherName"
+                  className="text-sm font-medium text-slate-700"
+                >
+                  Father's Name
+                </Label>
+                <Input
+                  id="fatherName"
+                  name="fatherName"
+                  value={formData.fatherName}
+                  onChange={handleInputChange}
+                  className="h-10 text-sm focus-visible:ring-blue-100"
+                  placeholder="Enter Father's Name"
+                />
+              </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="pumpSource" className="text-sm font-medium text-slate-700">
-                    Pump Source
-                  </Label>
-                  <Input id="pumpSource" name="pumpSource" value={formData.pumpSource} onChange={handleInputChange} className="h-10 text-sm focus-visible:ring-blue-100" placeholder="Source" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="pumpType" className="text-sm font-medium text-slate-700">
-                    Pump Type
-                  </Label>
-                  <Input id="pumpType" name="pumpType" value={formData.pumpType} onChange={handleInputChange} className="h-10 text-sm focus-visible:ring-blue-100" placeholder="Type" />
-                </div>
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="company" className="text-sm font-medium text-slate-700">
-                    Company
-                  </Label>
-                  <Input id="company" name="company" value={formData.company} onChange={handleInputChange} className="h-10 text-sm focus-visible:ring-blue-100" placeholder="Company Name" />
-                </div>
+              <div className="space-y-2">
+                <Label
+                  htmlFor="village"
+                  className="text-sm font-medium text-slate-700"
+                >
+                  Village
+                </Label>
+                <Input
+                  id="village"
+                  name="village"
+                  value={formData.village}
+                  onChange={handleInputChange}
+                  className="h-10 text-sm focus-visible:ring-blue-100"
+                  placeholder="Village Name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label
+                  htmlFor="block"
+                  className="text-sm font-medium text-slate-700"
+                >
+                  Block
+                </Label>
+                <Input
+                  id="block"
+                  name="block"
+                  value={formData.block}
+                  onChange={handleInputChange}
+                  className="h-10 text-sm focus-visible:ring-blue-100"
+                  placeholder="Block Name"
+                />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label
+                  htmlFor="district"
+                  className="text-sm font-medium text-slate-700"
+                >
+                  District
+                </Label>
+                <Input
+                  id="district"
+                  name="district"
+                  value={formData.district}
+                  onChange={handleInputChange}
+                  className="h-10 text-sm focus-visible:ring-blue-100"
+                  placeholder="District Name"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label
+                  htmlFor="pumpSource"
+                  className="text-sm font-medium text-slate-700"
+                >
+                  Pump Source
+                </Label>
+                <Input
+                  id="pumpSource"
+                  name="pumpSource"
+                  value={formData.pumpSource}
+                  onChange={handleInputChange}
+                  className="h-10 text-sm focus-visible:ring-blue-100"
+                  placeholder="Source"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label
+                  htmlFor="pumpType"
+                  className="text-sm font-medium text-slate-700"
+                >
+                  Pump Type
+                </Label>
+                <Input
+                  id="pumpType"
+                  name="pumpType"
+                  value={formData.pumpType}
+                  onChange={handleInputChange}
+                  className="h-10 text-sm focus-visible:ring-blue-100"
+                  placeholder="Type"
+                />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label
+                  htmlFor="company"
+                  className="text-sm font-medium text-slate-700"
+                >
+                  Company
+                </Label>
+                <Input
+                  id="company"
+                  name="company"
+                  value={formData.company}
+                  onChange={handleInputChange}
+                  className="h-10 text-sm focus-visible:ring-blue-100"
+                  placeholder="Company Name"
+                />
               </div>
             </div>
-            <div className="flex justify-end items-center gap-3 mt-4 pt-4 border-t shrink-0 bg-slate-50/50 -mx-6 px-6 -mb-4 pb-4">
-              <Button variant="outline" onClick={() => setOpen(false)} className="h-10 min-w-[100px]">
-                Cancel
-              </Button>
-              <Button onClick={handleSubmit} className="bg-linear-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 h-10 min-w-[100px] shadow-sm">
-                Submit
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+          </div>
+          <div className="flex justify-end items-center gap-3 mt-4 pt-4 border-t shrink-0 bg-slate-50/50 -mx-6 px-6 -mb-4 pb-4">
+            <Button
+              variant="outline"
+              onClick={() => setOpen(false)}
+              className="h-10 min-w-[100px]"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSubmit}
+              className="bg-linear-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 h-10 min-w-[100px] shadow-sm"
+            >
+              Submit
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Card className="border border-blue-100 shadow-lg shadow-blue-50/50 overflow-hidden bg-white">
         <CardContent className="!p-0">
-            {/* Desktop Table View */}
-              <div className="overflow-x-auto min-h-[300px] max-h-[70vh] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                <Table className="w-full text-sm text-left">
-                  <TableHeader className="bg-slate-50 sticky top-0 z-20 shadow-sm">
-                    <TableRow className="border-b border-blue-100 hover:bg-transparent">
-                      <TableHead className="h-12 px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider text-center w-[120px] bg-slate-50/95 backdrop-blur">
-                        Serial No
-                      </TableHead>
-                      <TableHead className="h-12 px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider text-center bg-slate-50/95 backdrop-blur">
-                        Reg ID
-                      </TableHead>
-                      <TableHead className="h-12 px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider text-center min-w-[180px] bg-slate-50/95 backdrop-blur">
-                        Beneficiary Name
-                      </TableHead>
-                      <TableHead className="h-12 px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider text-center min-w-[150px] bg-slate-50/95 backdrop-blur">
-                        Father's Name
-                      </TableHead>
-                      <TableHead className="h-12 px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider text-center bg-slate-50/95 backdrop-blur">
-                        Village
-                      </TableHead>
-                      <TableHead className="h-12 px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider text-center bg-slate-50/95 backdrop-blur">
-                        Block
-                      </TableHead>
-                      <TableHead className="h-12 px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider text-center bg-slate-50/95 backdrop-blur">
-                        District
-                      </TableHead>
-                      <TableHead className="h-12 px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider text-center bg-slate-50/95 backdrop-blur">
-                        Category
-                      </TableHead>
-                      <TableHead className="h-12 px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider text-center bg-slate-50/95 backdrop-blur">
-                        Pump Source
-                      </TableHead>
-                      <TableHead className="h-12 px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider text-center bg-slate-50/95 backdrop-blur">
-                        Pump Type
-                      </TableHead>
-                      <TableHead className="h-12 px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider text-center bg-slate-50/95 backdrop-blur">
-                        Company
-                      </TableHead>
+          {/* Desktop Table View */}
+          <div className="overflow-x-auto min-h-[300px] max-h-[70vh] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            <Table className="w-full text-sm text-left">
+              <TableHeader className="bg-slate-50 sticky top-0 z-20 shadow-sm">
+                <TableRow className="border-b border-blue-100 hover:bg-transparent">
+                  <TableHead className="h-12 px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider text-center w-[120px] bg-slate-50/95 backdrop-blur">
+                    Serial No
+                  </TableHead>
+                  <TableHead className="h-12 px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider text-center bg-slate-50/95 backdrop-blur">
+                    Reg ID
+                  </TableHead>
+                  <TableHead className="h-12 px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider text-center min-w-[180px] bg-slate-50/95 backdrop-blur">
+                    Beneficiary Name
+                  </TableHead>
+                  <TableHead className="h-12 px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider text-center min-w-[150px] bg-slate-50/95 backdrop-blur">
+                    Father's Name
+                  </TableHead>
+                  <TableHead className="h-12 px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider text-center bg-slate-50/95 backdrop-blur">
+                    Village
+                  </TableHead>
+                  <TableHead className="h-12 px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider text-center bg-slate-50/95 backdrop-blur">
+                    Block
+                  </TableHead>
+                  <TableHead className="h-12 px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider text-center bg-slate-50/95 backdrop-blur">
+                    District
+                  </TableHead>
+                  <TableHead className="h-12 px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider text-center bg-slate-50/95 backdrop-blur">
+                    Category
+                  </TableHead>
+                  <TableHead className="h-12 px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider text-center bg-slate-50/95 backdrop-blur">
+                    Pump Source
+                  </TableHead>
+                  <TableHead className="h-12 px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider text-center bg-slate-50/95 backdrop-blur">
+                    Pump Type
+                  </TableHead>
+                  <TableHead className="h-12 px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider text-center bg-slate-50/95 backdrop-blur">
+                    Company
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  Array.from({ length: 8 }).map((_, index) => (
+                    <TableRow
+                      key={`skeleton-${index}`}
+                      className="animate-pulse"
+                    >
+                      <TableCell>
+                        <div className="h-4 w-8 bg-slate-200 rounded mx-auto"></div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="h-4 w-16 bg-slate-200 rounded mx-auto"></div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="h-4 w-32 bg-slate-200 rounded mx-auto"></div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="h-4 w-24 bg-slate-200 rounded mx-auto"></div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="h-4 w-20 bg-slate-200 rounded mx-auto"></div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="h-4 w-20 bg-slate-200 rounded mx-auto"></div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="h-4 w-20 bg-slate-200 rounded mx-auto"></div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="h-4 w-12 bg-slate-200 rounded mx-auto"></div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="h-4 w-16 bg-slate-200 rounded mx-auto"></div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="h-4 w-16 bg-slate-200 rounded mx-auto"></div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="h-4 w-20 bg-slate-200 rounded mx-auto"></div>
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {isLoading ? (
-                      Array.from({ length: 8 }).map((_, index) => (
-                        <TableRow key={`skeleton-${index}`} className="animate-pulse">
-                          <TableCell><div className="h-4 w-8 bg-slate-200 rounded mx-auto"></div></TableCell>
-                          <TableCell><div className="h-4 w-16 bg-slate-200 rounded mx-auto"></div></TableCell>
-                          <TableCell><div className="h-4 w-32 bg-slate-200 rounded mx-auto"></div></TableCell>
-                          <TableCell><div className="h-4 w-24 bg-slate-200 rounded mx-auto"></div></TableCell>
-                          <TableCell><div className="h-4 w-20 bg-slate-200 rounded mx-auto"></div></TableCell>
-                          <TableCell><div className="h-4 w-20 bg-slate-200 rounded mx-auto"></div></TableCell>
-                          <TableCell><div className="h-4 w-20 bg-slate-200 rounded mx-auto"></div></TableCell>
-                          <TableCell><div className="h-4 w-12 bg-slate-200 rounded mx-auto"></div></TableCell>
-                          <TableCell><div className="h-4 w-16 bg-slate-200 rounded mx-auto"></div></TableCell>
-                          <TableCell><div className="h-4 w-16 bg-slate-200 rounded mx-auto"></div></TableCell>
-                          <TableCell><div className="h-4 w-20 bg-slate-200 rounded mx-auto"></div></TableCell>
-                        </TableRow>
-                      ))
-                    ) : filteredHistory.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={11} className="h-32 text-center text-muted-foreground bg-slate-50/50">
-                            <div className="flex flex-col items-center justify-center gap-2">
-                                <Search className="h-8 w-8 text-slate-300 mb-2" />
-                                <p>No matching records found.</p>
-                            </div>
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      filteredHistory.map((item) => (
-                        <TableRow key={item.serialNo} className="hover:bg-blue-50/50 transition-all duration-200 border-b border-slate-50 last:border-0 hover:shadow-sm">
-                          <TableCell className="font-mono text-center text-xs text-slate-500 bg-slate-50/30">
-                            {item.serialNo}
-                          </TableCell>
-                          <TableCell className="text-center text-xs font-medium text-slate-700">{item.regId}</TableCell>
-                          <TableCell className="text-center font-semibold text-slate-800 text-sm">{item.beneficiaryName}</TableCell>
-                          <TableCell className="text-center text-slate-600 text-sm">{item.fatherName}</TableCell>
-                          <TableCell className="text-center text-slate-600 text-sm">{item.village}</TableCell>
-                          <TableCell className="text-center text-slate-600 text-sm">{item.block}</TableCell>
-                          <TableCell className="text-center text-slate-600 text-sm">{item.district}</TableCell>
-                          <TableCell className="text-center text-slate-600 text-sm">{item.category}</TableCell>
-                          <TableCell className="text-center text-slate-600 text-sm">{item.pumpSource}</TableCell>
-                          <TableCell className="text-center text-slate-600 text-sm">{item.pumpType}</TableCell>
-                          <TableCell className="text-center text-slate-600 text-sm font-medium">{item.company}</TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-
+                  ))
+                ) : filteredHistory.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={11}
+                      className="h-32 text-center text-muted-foreground bg-slate-50/50"
+                    >
+                      <div className="flex flex-col items-center justify-center gap-2">
+                        <Search className="h-8 w-8 text-slate-300 mb-2" />
+                        <p>No matching records found.</p>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredHistory.map((item) => (
+                    <TableRow
+                      key={item.serialNo}
+                      className="hover:bg-blue-50/50 transition-all duration-200 border-b border-slate-50 last:border-0 hover:shadow-sm"
+                    >
+                      <TableCell className="font-mono text-center text-xs text-slate-500 bg-slate-50/30">
+                        {item.serialNo}
+                      </TableCell>
+                      <TableCell className="text-center text-xs font-medium text-slate-700">
+                        {item.regId}
+                      </TableCell>
+                      <TableCell className="text-center font-semibold text-slate-800 text-sm">
+                        {item.beneficiaryName}
+                      </TableCell>
+                      <TableCell className="text-center text-slate-600 text-sm">
+                        {item.fatherName}
+                      </TableCell>
+                      <TableCell className="text-center text-slate-600 text-sm">
+                        {item.village}
+                      </TableCell>
+                      <TableCell className="text-center text-slate-600 text-sm">
+                        {item.block}
+                      </TableCell>
+                      <TableCell className="text-center text-slate-600 text-sm">
+                        {item.district}
+                      </TableCell>
+                      <TableCell className="text-center text-slate-600 text-sm">
+                        {item.category}
+                      </TableCell>
+                      <TableCell className="text-center text-slate-600 text-sm">
+                        {item.pumpSource}
+                      </TableCell>
+                      <TableCell className="text-center text-slate-600 text-sm">
+                        {item.pumpType}
+                      </TableCell>
+                      <TableCell className="text-center text-slate-600 text-sm font-medium">
+                        {item.company}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
-    </div>);
+    </div>
+  );
 }

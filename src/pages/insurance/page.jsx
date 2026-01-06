@@ -20,7 +20,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Shield, FileCheck, Upload, Loader2, CheckCircle2, Search } from "lucide-react";
+import {
+  Shield,
+  FileCheck,
+  Upload,
+  Loader2,
+  CheckCircle2,
+  Search,
+} from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 
 export default function InsurancePage() {
@@ -43,19 +50,75 @@ export default function InsurancePage() {
   const [isBulk, setIsBulk] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
-  const filteredPendingItems = pendingItems.filter((item) =>
-    Object.values(item).some((value) =>
-      String(value).toLowerCase().includes(searchTerm.toLowerCase())
-    )
-  );
+  const [filters, setFilters] = useState({
+    regId: "",
+    village: "",
+    block: "",
+    district: "",
+    pumpType: "",
+    company: "",
+  });
 
-  const filteredHistoryItems = historyItems.filter((item) =>
-    Object.values(item).some((value) =>
-      String(value).toLowerCase().includes(searchTerm.toLowerCase())
-    )
-  );
+  const getUniquePendingValues = (field) => {
+    const values = pendingItems
+      .map((item) => item[field])
+      .filter((v) => v && v !== "-");
+    return [...new Set(values)].sort();
+  };
+
+  const getUniqueHistoryValues = (field) => {
+    const values = historyItems
+      .map((item) => item[field])
+      .filter((v) => v && v !== "-");
+    return [...new Set(values)].sort();
+  };
+
+  // const filteredPendingItems = pendingItems.filter((item) =>
+  //   Object.values(item).some((value) =>
+  //     String(value).toLowerCase().includes(searchTerm.toLowerCase())
+  //   )
+  // );
+
+  // const filteredHistoryItems = historyItems.filter((item) =>
+  //   Object.values(item).some((value) =>
+  //     String(value).toLowerCase().includes(searchTerm.toLowerCase())
+  //   )
+  // );
 
   // Helper to construct preview URLs
+
+  const filteredPendingItems = pendingItems.filter((item) => {
+    const matchesSearch = Object.values(item).some((value) =>
+      String(value).toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    const matchesFilters =
+      (!filters.regId || item.regId === filters.regId) &&
+      (!filters.village || item.village === filters.village) &&
+      (!filters.block || item.block === filters.block) &&
+      (!filters.district || item.district === filters.district) &&
+      (!filters.pumpType || item.pumpType === filters.pumpType) &&
+      (!filters.company || item.company === filters.company);
+
+    return matchesSearch && matchesFilters;
+  });
+
+  const filteredHistoryItems = historyItems.filter((item) => {
+    const matchesSearch = Object.values(item).some((value) =>
+      String(value).toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    const matchesFilters =
+      (!filters.regId || item.regId === filters.regId) &&
+      (!filters.village || item.village === filters.village) &&
+      (!filters.block || item.block === filters.block) &&
+      (!filters.district || item.district === filters.district) &&
+      (!filters.pumpType || item.pumpType === filters.pumpType) &&
+      (!filters.company || item.company === filters.company);
+
+    return matchesSearch && matchesFilters;
+  });
+
   const getPreviewUrl = (idOrLink) => {
     if (!idOrLink) return "";
     const idMatch = idOrLink.match(/[-\w]{25,}/);
@@ -90,18 +153,20 @@ export default function InsurancePage() {
         return;
       }
 
-      const headerRowIndex = 5; 
+      const headerRowIndex = 5;
       if (!rawRows[headerRowIndex]) {
         console.error("Header row missing");
         setIsLoading(false);
         return;
       }
 
-      const rawHeaders = rawRows[headerRowIndex].map(h => String(h).trim());
-      const headers = rawHeaders.map(h => h.toLowerCase());
+      const rawHeaders = rawRows[headerRowIndex].map((h) => String(h).trim());
+      const headers = rawHeaders.map((h) => h.toLowerCase());
 
       const findCol = (keys) =>
-        headers.findIndex(h => keys.every(k => h.replace(/\s+/g, "").includes(k)));
+        headers.findIndex((h) =>
+          keys.every((k) => h.replace(/\s+/g, "").includes(k))
+        );
 
       const colMap = {
         serialNo: findCol(["serial"]),
@@ -120,10 +185,10 @@ export default function InsurancePage() {
           return i;
         })(),
         installationCompletionDate: (() => {
-           let i = findCol(["install", "date"]);
-           if (i === -1) i = findCol(["completion", "date"]);
-           if (i === -1) i = findCol(["commissioning", "date"]);
-           return i;
+          let i = findCol(["install", "date"]);
+          if (i === -1) i = findCol(["completion", "date"]);
+          if (i === -1) i = findCol(["commissioning", "date"]);
+          return i;
         })(),
 
         // Policy Info in History
@@ -131,31 +196,31 @@ export default function InsurancePage() {
         policyNo: findCol(["policy", "no"]),
         policyDate: findCol(["policy", "date"]),
         insuranceCompany: (() => {
-           let i = findCol(["insurance", "company"]);
-           if (i === -1) i = findCol(["ins", "comp"]);
-           if (i === -1) i = findCol(["insurance", "name"]);
-           return i;
+          let i = findCol(["insurance", "company"]);
+          if (i === -1) i = findCol(["ins", "comp"]);
+          if (i === -1) i = findCol(["insurance", "name"]);
+          return i;
         })(),
         insuranceForm: (() => {
-           let i = findCol(["insurance", "form"]);
-           if (i === -1) i = findCol(["insurance", "pdf"]);
-           return i;
+          let i = findCol(["insurance", "form"]);
+          if (i === -1) i = findCol(["insurance", "pdf"]);
+          return i;
         })(),
-        
+
         // Triggers
         actual5: (() => {
-           const i = findCol(["actual", "5"]);
-           if (i !== -1) return i;
-           return findCol(["system", "info"]); 
+          const i = findCol(["actual", "5"]);
+          if (i !== -1) return i;
+          return findCol(["system", "info"]);
         })(),
         planned6: findCol(["planned", "6"]), // Insurance Planned
         actual6: (() => {
-           const i = findCol(["actual", "6"]);
-           if (i !== -1) return i;
-           return findCol(["insurance"]); 
+          const i = findCol(["actual", "6"]);
+          if (i !== -1) return i;
+          return findCol(["insurance"]);
         })(),
       };
-      
+
       console.log("Insurance Col Map:", colMap);
       setColumnMapping(colMap);
 
@@ -167,7 +232,8 @@ export default function InsurancePage() {
         if (!row || !row[colMap.regId]) continue;
 
         // Safely access fields
-        const getVal = (idx) => (idx !== -1 && row[idx] !== undefined) ? row[idx] : "";
+        const getVal = (idx) =>
+          idx !== -1 && row[idx] !== undefined ? row[idx] : "";
 
         const item = {
           serialNo: getVal(colMap.serialNo),
@@ -187,21 +253,22 @@ export default function InsurancePage() {
           policyDate: getVal(colMap.policyDate),
           insuranceCompany: getVal(colMap.insuranceCompany),
           insuranceForm: getVal(colMap.insuranceForm),
-          
+
           actual5: getVal(colMap.actual5),
           planned6: getVal(colMap.planned6),
           actual6: getVal(colMap.actual6),
           rowIndex: i + 1,
-        }
+        };
 
         const isPlanned6 = item.planned6 && String(item.planned6).trim() !== "";
-        const isInsuranceDone = item.actual6 && String(item.actual6).trim() !== ""; 
+        const isInsuranceDone =
+          item.actual6 && String(item.actual6).trim() !== "";
 
         if (isInsuranceDone) {
-            history.push(item);
+          history.push(item);
         } else if (isPlanned6) {
-            // Planned6 present, Insurance NOT Done -> Pending
-            pending.push(item);
+          // Planned6 present, Insurance NOT Done -> Pending
+          pending.push(item);
         }
       }
 
@@ -210,7 +277,6 @@ export default function InsurancePage() {
 
       setPendingItems(pending);
       setHistoryItems(history);
-
     } catch (e) {
       console.error("Fetch Data Error:", e);
     } finally {
@@ -220,7 +286,7 @@ export default function InsurancePage() {
 
   useEffect(() => {
     fetchData();
-    const timer = setTimeout(() => setIsLoading(false), 15000); 
+    const timer = setTimeout(() => setIsLoading(false), 15000);
     return () => clearTimeout(timer);
   }, []);
 
@@ -235,7 +301,7 @@ export default function InsurancePage() {
   }, [isSuccess]);
 
   const handleActionClick = (item) => {
-    // alert("Debug: Button Clicked"); 
+    // alert("Debug: Button Clicked");
     console.log("Process Insurance clicked for:", item);
     setIsSuccess(false);
     setIsBulk(false);
@@ -254,19 +320,19 @@ export default function InsurancePage() {
   };
 
   const handleSelectAll = (checked) => {
-      if (checked) {
-          setSelectedRows(filteredPendingItems.map((item) => item.serialNo));
-      } else {
-          setSelectedRows([]);
-      }
+    if (checked) {
+      setSelectedRows(filteredPendingItems.map((item) => item.serialNo));
+    } else {
+      setSelectedRows([]);
+    }
   };
 
   const handleSelectRow = (serialNo, checked) => {
-      if (checked) {
-          setSelectedRows((prev) => [...prev, serialNo]);
-      } else {
-          setSelectedRows((prev) => prev.filter((id) => id !== serialNo));
-      }
+    if (checked) {
+      setSelectedRows((prev) => [...prev, serialNo]);
+    } else {
+      setSelectedRows((prev) => prev.filter((id) => id !== serialNo));
+    }
   };
 
   const handleBulkClick = () => {
@@ -293,127 +359,133 @@ export default function InsurancePage() {
     setIsSubmitting(true);
 
     try {
-       const scriptUrl = import.meta.env.VITE_APP_SCRIPT_URL;
-       const sheetId = import.meta.env.VITE_SHEET_ID;
+      const scriptUrl = import.meta.env.VITE_APP_SCRIPT_URL;
+      const sheetId = import.meta.env.VITE_SHEET_ID;
 
-       // 1. Upload File (if exists) - Single upload for bulk
-       let fileLink = formData.insuranceForm; 
-       const fileInput = document.getElementById("insurance-form-file");
-       
-       if (fileInput && fileInput.files[0]) {
-          const file = fileInput.files[0];
-          const reader = new FileReader();
-          
-          fileLink = await new Promise((resolve, reject) => {
-             reader.onload = async (e) => {
-                const base64Data = e.target.result.split(",")[1];
-                // Prefix filename with BULK_ if bulk operation
-                const fileName = isBulk 
-                    ? `BULK_${Date.now()}_${file.name}` 
-                    : file.name;
+      // 1. Upload File (if exists) - Single upload for bulk
+      let fileLink = formData.insuranceForm;
+      const fileInput = document.getElementById("insurance-form-file");
 
-                const uploadParams = new URLSearchParams({
-                   action: "uploadFile",
-                   fileName: fileName,
-                   mimeType: file.type,
-                   base64Data: base64Data,
-                   folderId: import.meta.env.VITE_DRIVE_DOC_FOLDER_ID,
-                });
-                
-                try {
-                   const uploadRes = await fetch(`${scriptUrl}`, {
-                      method: "POST",
-                      body: uploadParams,
-                   });
-                   const uploadResult = await uploadRes.json();
-                   if (uploadResult.success && uploadResult.fileUrl) {
-                      resolve(uploadResult.fileUrl);
-                   } else {
-                      reject("Upload failed");
-                   }
-                } catch (err) {
-                   reject(err);
-                }
-             };
-             reader.readAsDataURL(file);
-          });
-       }
+      if (fileInput && fileInput.files[0]) {
+        const file = fileInput.files[0];
+        const reader = new FileReader();
 
-       // 2. Identify Items to Process
-       let itemsToProcess = [];
-       if (isBulk) {
-           itemsToProcess = pendingItems.filter(item => selectedRows.includes(item.serialNo));
-       } else {
-           itemsToProcess = [selectedItem];
-       }
+        fileLink = await new Promise((resolve, reject) => {
+          reader.onload = async (e) => {
+            const base64Data = e.target.result.split(",")[1];
+            // Prefix filename with BULK_ if bulk operation
+            const fileName = isBulk
+              ? `BULK_${Date.now()}_${file.name}`
+              : file.name;
 
-       // 3. Process Each Item
-       const updatePromises = itemsToProcess.map(async (item) => {
-            const rowUpdate = {};
-            const addToUpdate = (key, val) => {
-                const idx = columnMapping[key];
-                if (idx !== undefined && idx >= 0) {
-                    rowUpdate[idx] = val;
-                }
-            };
-
-            addToUpdate("policyNo", "'" + formData.policyNo); // Preserve leading zeros
-            addToUpdate("policyDate", formData.policyDate);
-            addToUpdate("insuranceCompany", formData.insuranceCompany); 
-            addToUpdate("insuranceForm", fileLink);
-            
-            const now = new Date();
-            const timestamp =
-              `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')} ` +
-              `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
-            
-            addToUpdate("actual6", timestamp);
-
-            // Send Update
-            const updatePayload = new URLSearchParams({
-               action: "update",
-               sheet: "Project Main",
-               sheetName: "Project Main",
-               id: sheetId,
-               rowIndex: item.rowIndex,
-               rowData: JSON.stringify(rowUpdate),
+            const uploadParams = new URLSearchParams({
+              action: "uploadFile",
+              fileName: fileName,
+              mimeType: file.type,
+              base64Data: base64Data,
+              folderId: import.meta.env.VITE_DRIVE_DOC_FOLDER_ID,
             });
 
-            const updateRes = await fetch(scriptUrl, {
-               method: "POST",
-               headers: { "Content-Type": "application/x-www-form-urlencoded" },
-               body: updatePayload,
-            });
+            try {
+              const uploadRes = await fetch(`${scriptUrl}`, {
+                method: "POST",
+                body: uploadParams,
+              });
+              const uploadResult = await uploadRes.json();
+              if (uploadResult.success && uploadResult.fileUrl) {
+                resolve(uploadResult.fileUrl);
+              } else {
+                reject("Upload failed");
+              }
+            } catch (err) {
+              reject(err);
+            }
+          };
+          reader.readAsDataURL(file);
+        });
+      }
 
-            return updateRes.json();
-       });
+      // 2. Identify Items to Process
+      let itemsToProcess = [];
+      if (isBulk) {
+        itemsToProcess = pendingItems.filter((item) =>
+          selectedRows.includes(item.serialNo)
+        );
+      } else {
+        itemsToProcess = [selectedItem];
+      }
 
-       const results = await Promise.all(updatePromises);
-       
-       // Check results
-       const failed = results.filter(r => r.status === 'error' || r.result === 'error');
-       if (failed.length > 0) {
-           throw new Error(`${failed.length} updates failed.`);
-       }
+      // 3. Process Each Item
+      const updatePromises = itemsToProcess.map(async (item) => {
+        const rowUpdate = {};
+        const addToUpdate = (key, val) => {
+          const idx = columnMapping[key];
+          if (idx !== undefined && idx >= 0) {
+            rowUpdate[idx] = val;
+          }
+        };
 
-       await fetchData(); 
-       setSelectedItem(null);
-       setIsBulk(false);
-       setSelectedRows([]);
-       setIsSuccess(true);
+        addToUpdate("policyNo", "'" + formData.policyNo); // Preserve leading zeros
+        addToUpdate("policyDate", formData.policyDate);
+        addToUpdate("insuranceCompany", formData.insuranceCompany);
+        addToUpdate("insuranceForm", fileLink);
 
+        const now = new Date();
+        const timestamp =
+          `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(
+            2,
+            "0"
+          )}/${String(now.getDate()).padStart(2, "0")} ` +
+          `${String(now.getHours()).padStart(2, "0")}:${String(
+            now.getMinutes()
+          ).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
+
+        addToUpdate("actual6", timestamp);
+
+        // Send Update
+        const updatePayload = new URLSearchParams({
+          action: "update",
+          sheet: "Project Main",
+          sheetName: "Project Main",
+          id: sheetId,
+          rowIndex: item.rowIndex,
+          rowData: JSON.stringify(rowUpdate),
+        });
+
+        const updateRes = await fetch(scriptUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: updatePayload,
+        });
+
+        return updateRes.json();
+      });
+
+      const results = await Promise.all(updatePromises);
+
+      // Check results
+      const failed = results.filter(
+        (r) => r.status === "error" || r.result === "error"
+      );
+      if (failed.length > 0) {
+        throw new Error(`${failed.length} updates failed.`);
+      }
+
+      await fetchData();
+      setSelectedItem(null);
+      setIsBulk(false);
+      setSelectedRows([]);
+      setIsSuccess(true);
     } catch (error) {
-       console.error("Submission Error:", error);
-       alert("Error submitting form: " + error.message);
+      console.error("Submission Error:", error);
+      alert("Error submitting form: " + error.message);
     } finally {
-       setIsSubmitting(false);
+      setIsSubmitting(false);
     }
   };
 
   return (
     <div className="space-y-8 p-6 md:p-8 max-w-[1600px] mx-auto bg-slate-50/50 min-h-screen animate-fade-in-up">
-
-
       <Tabs
         defaultValue="pending"
         className="w-full"
@@ -456,18 +528,18 @@ export default function InsurancePage() {
               </div>
 
               <div className="flex flex-col md:flex-row items-center gap-3 w-full md:w-auto">
-                 <div className="relative w-full md:w-100">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                    <Input 
-                        placeholder="Search..." 
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-9 bg-white border-black focus-visible:ring-blue-200 h-9 transition-all hover:border-blue-200"
-                    />
-                 </div>
-                 
-                 <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-                    {selectedRows.length >= 2 && (
+                <div className="relative w-full md:w-100">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Input
+                    placeholder="Search..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-9 bg-white border-black focus-visible:ring-blue-200 h-9 transition-all hover:border-blue-200"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+                  {selectedRows.length >= 2 && (
                     <Button
                       onClick={handleBulkClick}
                       className="bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-200 transition-all duration-300 animate-in fade-in slide-in-from-right-4 h-9"
@@ -481,11 +553,61 @@ export default function InsurancePage() {
                     variant="outline"
                     className="bg-yellow-100 text-yellow-700 border-yellow-200 px-3 py-1 h-9 flex items-center"
                   >
-                     {filteredPendingItems.length} Pending
+                    {filteredPendingItems.length} Pending
                   </Badge>
                 </div>
               </div>
             </CardHeader>
+
+            {/* Filter Dropdowns */}
+            <div className="px-6 py-4 bg-slate-50/50 border-b border-blue-50">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                {[
+                  { key: "regId", label: "Reg ID" },
+                  { key: "village", label: "Village" },
+                  { key: "block", label: "Block" },
+                  { key: "district", label: "District" },
+                  { key: "pumpType", label: "Pump Type" },
+                  { key: "company", label: "Company" },
+                ].map(({ key, label }) => (
+                  <div key={key} className="space-y-1.5">
+                    <Label className="text-xs text-slate-600">{label}</Label>
+                    <select
+                      value={filters[key]}
+                      onChange={(e) =>
+                        setFilters({ ...filters, [key]: e.target.value })
+                      }
+                      className="w-full h-9 px-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    >
+                      <option value="">All</option>
+                      {getUniquePendingValues(key).map((val) => (
+                        <option key={val} value={val}>
+                          {val}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setFilters({
+                    regId: "",
+                    village: "",
+                    block: "",
+                    district: "",
+                    pumpType: "",
+                    company: "",
+                  })
+                }
+                className="mt-3 text-xs"
+              >
+                Clear All Filters
+              </Button>
+            </div>
             <CardContent className="p-0">
               {/* Desktop Table */}
               <div className="overflow-x-auto">
@@ -493,7 +615,18 @@ export default function InsurancePage() {
                   <TableHeader className="bg-gradient-to-r from-blue-50/50 to-cyan-50/50">
                     <TableRow className="border-b border-blue-100 hover:bg-transparent">
                       <TableHead className="h-14 px-4 text-xs font-bold text-slate-600 uppercase tracking-wider whitespace-nowrap w-12">
-                          Select
+                        <div className="flex justify-center">
+                          <Checkbox
+                            checked={
+                              filteredPendingItems.length > 0 &&
+                              selectedRows.length ===
+                                filteredPendingItems.length
+                            }
+                            onCheckedChange={handleSelectAll}
+                            aria-label="Select all rows"
+                            className="checkbox-3d border-slate-400 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 h-5 w-5 shadow-sm transition-all duration-300 ease-out"
+                          />
+                        </div>
                       </TableHead>
                       <TableHead className="h-14 px-6 text-xs font-bold text-slate-600 uppercase tracking-wider whitespace-nowrap min-w-[150px]">
                         Action
@@ -537,7 +670,10 @@ export default function InsurancePage() {
                   <TableBody>
                     {isLoading ? (
                       Array.from({ length: 6 }).map((_, index) => (
-                        <TableRow key={`pending-skel-${index}`} className="animate-pulse">
+                        <TableRow
+                          key={`pending-skel-${index}`}
+                          className="animate-pulse"
+                        >
                           {Array.from({ length: 13 }).map((__, i) => (
                             <TableCell key={i}>
                               <div className="h-4 w-full bg-slate-200 rounded mx-auto"></div>
@@ -555,7 +691,10 @@ export default function InsurancePage() {
                             <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center">
                               <Shield className="h-6 w-6 text-slate-400" />
                             </div>
-                            <p>No pending insurance requests found matching your search</p>
+                            <p>
+                              No pending insurance requests found matching your
+                              search
+                            </p>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -567,9 +706,11 @@ export default function InsurancePage() {
                         >
                           <TableCell className="px-4">
                             <div className="flex justify-center">
-                              <Checkbox 
+                              <Checkbox
                                 checked={selectedRows.includes(item.serialNo)}
-                                onCheckedChange={(checked) => handleSelectRow(item.serialNo, checked)}
+                                onCheckedChange={(checked) =>
+                                  handleSelectRow(item.serialNo, checked)
+                                }
                                 aria-label={`Select row ${item.serialNo}`}
                                 className="checkbox-3d border-slate-400 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 h-5 w-5 shadow-sm transition-all duration-300 ease-out active:scale-75 hover:scale-110 data-[state=checked]:scale-110"
                               />
@@ -732,16 +873,16 @@ export default function InsurancePage() {
               </div>
 
               <div className="flex flex-col md:flex-row items-center gap-3 w-full md:w-auto">
-                 <div className="relative w-full md:w-100">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                    <Input 
-                        placeholder="Search..." 
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-9 bg-white border-black focus-visible:ring-blue-200 h-9 transition-all hover:border-blue-200"
-                    />
-                 </div>
-                 <Badge
+                <div className="relative w-full md:w-100">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Input
+                    placeholder="Search..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-9 bg-white border-black focus-visible:ring-blue-200 h-9 transition-all hover:border-blue-200"
+                  />
+                </div>
+                <Badge
                   variant="outline"
                   className="bg-blue-100 text-blue-700 border-blue-200 px-3 py-1 h-9 flex items-center whitespace-nowrap"
                 >
@@ -749,13 +890,63 @@ export default function InsurancePage() {
                 </Badge>
               </div>
             </CardHeader>
+
+            {/* Filter Dropdowns */}
+            <div className="px-6 py-4 bg-slate-50/50 border-b border-blue-50">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                {[
+                  { key: "regId", label: "Reg ID" },
+                  { key: "village", label: "Village" },
+                  { key: "block", label: "Block" },
+                  { key: "district", label: "District" },
+                  { key: "pumpType", label: "Pump Type" },
+                  { key: "company", label: "Company" },
+                ].map(({ key, label }) => (
+                  <div key={key} className="space-y-1.5">
+                    <Label className="text-xs text-slate-600">{label}</Label>
+                    <select
+                      value={filters[key]}
+                      onChange={(e) =>
+                        setFilters({ ...filters, [key]: e.target.value })
+                      }
+                      className="w-full h-9 px-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    >
+                      <option value="">All</option>
+                      {getUniqueHistoryValues(key).map((val) => (
+                        <option key={val} value={val}>
+                          {val}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setFilters({
+                    regId: "",
+                    village: "",
+                    block: "",
+                    district: "",
+                    pumpType: "",
+                    company: "",
+                  })
+                }
+                className="mt-3 text-xs"
+              >
+                Clear All Filters
+              </Button>
+            </div>
+
             <CardContent className="p-0">
               {/* Desktop Table */}
               <div className="hidden md:block overflow-x-auto">
                 <Table className="[&_th]:text-center [&_td]:text-center">
                   <TableHeader className="bg-gradient-to-r from-blue-50/50 to-cyan-50/50">
                     <TableRow className="border-b border-blue-100 hover:bg-transparent">
-
                       <TableHead className="h-14 px-6 text-xs font-bold text-slate-600 uppercase tracking-wider whitespace-nowrap">
                         Reg ID
                       </TableHead>
@@ -791,7 +982,10 @@ export default function InsurancePage() {
                   <TableBody>
                     {isLoading ? (
                       Array.from({ length: 6 }).map((_, index) => (
-                        <TableRow key={`history-skel-${index}`} className="animate-pulse">
+                        <TableRow
+                          key={`history-skel-${index}`}
+                          className="animate-pulse"
+                        >
                           {Array.from({ length: 10 }).map((__, i) => (
                             <TableCell key={i}>
                               <div className="h-4 w-full bg-slate-200 rounded mx-auto"></div>
@@ -809,7 +1003,11 @@ export default function InsurancePage() {
                             <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center">
                               <FileCheck className="h-6 w-6 text-slate-400" />
                             </div>
-                            <p>{historyItems.length === 0 ? "No insurance records yet." : "No history records found matching your search."}</p>
+                            <p>
+                              {historyItems.length === 0
+                                ? "No insurance records yet."
+                                : "No history records found matching your search."}
+                            </p>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -819,7 +1017,6 @@ export default function InsurancePage() {
                           key={item.serialNo}
                           className="hover:bg-blue-50/30 transition-colors"
                         >
-
                           <TableCell>
                             <span className="font-mono text-xs text-slate-500 bg-slate-50 py-1 px-2 rounded-md">
                               {item.regId}
@@ -858,9 +1055,16 @@ export default function InsurancePage() {
                               <Badge
                                 variant="outline"
                                 className="bg-blue-50 text-blue-700 hover:bg-blue-100 cursor-pointer border-blue-200 gap-1"
-                                onClick={() => window.open(getPreviewUrl(item.insuranceForm), "_blank")}
+                                onClick={() =>
+                                  window.open(
+                                    getPreviewUrl(item.insuranceForm),
+                                    "_blank"
+                                  )
+                                }
                               >
-                                {item.insuranceForm.includes("drive.google.com") ? "View Document" : item.insuranceForm}
+                                {item.insuranceForm.includes("drive.google.com")
+                                  ? "View Document"
+                                  : item.insuranceForm}
                               </Badge>
                             ) : (
                               <span className="text-slate-400">-</span>
@@ -958,177 +1162,211 @@ export default function InsurancePage() {
 
       {/* INSURANCE DIALOG */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent showCloseButton={!isSuccess} className={`max-w-4xl max-h-[90vh] overflow-y-auto p-0 gap-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] ${isSuccess ? "bg-transparent !shadow-none !border-none" : "bg-white"}`}>
-        {isSuccess ? (
+        <DialogContent
+          showCloseButton={!isSuccess}
+          className={`max-w-4xl max-h-[90vh] overflow-y-auto p-0 gap-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] ${
+            isSuccess ? "bg-transparent !shadow-none !border-none" : "bg-white"
+          }`}
+        >
+          {isSuccess ? (
             <div className="flex flex-col items-center justify-center w-full p-8 text-center space-y-6 animate-in fade-in duration-300">
-                <div className="rounded-full bg-white p-5 shadow-2xl shadow-white/20 ring-8 ring-white/10 animate-in zoom-in duration-500 ease-out">
-                    <CheckCircle2 className="h-16 w-16 text-green-600 scale-110" />
-                </div>
-                <h2 className="text-3xl font-bold text-white drop-shadow-md animate-in slide-in-from-bottom-4 fade-in duration-500 delay-150 ease-out tracking-wide">
-                    Submitted Successfully!
-                </h2>
-            </div>
-        ) : (
-            <>
-          <DialogHeader className="p-6 pb-2 border-b border-blue-100 bg-blue-50/30">
-            <DialogTitle className="text-xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent flex items-center gap-2">
-              <span className="bg-blue-100 p-1.5 rounded-md">
-                <Shield className="h-4 w-4 text-blue-600" />
-              </span>
-              Enter Insurance Information
-            </DialogTitle>
-            <DialogDescription className="text-slate-500 ml-10">
-              {isBulk ? (
-                  <span>Applying changes to <span className="font-bold text-blue-700">{selectedRows.length} selected items</span>. All fields below will be updated for these items.</span>
-              ) : (
-                  <span>Enter insurance policy details for <span className="font-semibold text-slate-700">{selectedItem?.beneficiaryName}</span></span>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-
-          {(selectedItem || isBulk) && (
-            <div className="grid gap-6 p-6">
-              {/* Beneficiary Details Card - Hide in Bulk */}
-              {!isBulk && selectedItem && (
-              <div className="rounded-xl border border-blue-100 bg-gradient-to-br from-blue-50/50 to-cyan-50/30 p-5 shadow-sm">
-                <div className="flex items-center gap-2 mb-4 pb-2 border-b border-blue-100/50">
-                  <span className="bg-white p-1 rounded shadow-sm">
-                    <Shield className="h-4 w-4 text-blue-500" />
-                  </span>
-                  <h4 className="font-semibold text-blue-900">
-                    Beneficiary Details
-                  </h4>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-y-4 gap-x-6 text-sm">
-                  {[
-                    { label: "Serial No", value: selectedItem.serialNo },
-                    { label: "Reg ID", value: selectedItem.regId },
-                    { label: "Beneficiary Name", value: selectedItem.beneficiaryName },
-                    { label: "Father's Name", value: selectedItem.fatherName },
-                    { label: "Village", value: selectedItem.village },
-                    { label: "District", value: selectedItem.district },
-                    { label: "Pump Type", value: selectedItem.pumpType },
-                    { label: "Company", value: selectedItem.company },
-                  ].map((field, i) => (
-                    <div key={i}>
-                      <span className="text-xs font-medium text-blue-600/70 uppercase tracking-wider block mb-1">
-                        {field.label}
-                      </span>
-                      <p className="font-semibold text-slate-700">
-                        {field.value || "-"}
-                      </p>
-                    </div>
-                  ))}
-                </div>
+              <div className="rounded-full bg-white p-5 shadow-2xl shadow-white/20 ring-8 ring-white/10 animate-in zoom-in duration-500 ease-out">
+                <CheckCircle2 className="h-16 w-16 text-green-600 scale-110" />
               </div>
-              )}
+              <h2 className="text-3xl font-bold text-white drop-shadow-md animate-in slide-in-from-bottom-4 fade-in duration-500 delay-150 ease-out tracking-wide">
+                Submitted Successfully!
+              </h2>
+            </div>
+          ) : (
+            <>
+              <DialogHeader className="p-6 pb-2 border-b border-blue-100 bg-blue-50/30">
+                <DialogTitle className="text-xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent flex items-center gap-2">
+                  <span className="bg-blue-100 p-1.5 rounded-md">
+                    <Shield className="h-4 w-4 text-blue-600" />
+                  </span>
+                  Enter Insurance Information
+                </DialogTitle>
+                <DialogDescription className="text-slate-500 ml-10">
+                  {isBulk ? (
+                    <span>
+                      Applying changes to{" "}
+                      <span className="font-bold text-blue-700">
+                        {selectedRows.length} selected items
+                      </span>
+                      . All fields below will be updated for these items.
+                    </span>
+                  ) : (
+                    <span>
+                      Enter insurance policy details for{" "}
+                      <span className="font-semibold text-slate-700">
+                        {selectedItem?.beneficiaryName}
+                      </span>
+                    </span>
+                  )}
+                </DialogDescription>
+              </DialogHeader>
 
-              {/* Form Fields */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label className="text-slate-700 font-medium">Policy No</Label>
-                  <Input
-                    value={formData.policyNo}
-                    onChange={(e) =>
-                      setFormData({ ...formData, policyNo: e.target.value })
-                    }
-                    placeholder="Enter policy number"
-                    className="border-slate-200 focus:border-cyan-400 focus-visible:ring-cyan-100 bg-white"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-slate-700 font-medium">Policy Date</Label>
-                  <Input
-                    type="date"
-                    value={formData.policyDate}
-                    onChange={(e) =>
-                      setFormData({ ...formData, policyDate: e.target.value })
-                    }
-                    className="border-slate-200 focus:border-cyan-400 focus-visible:ring-cyan-100 bg-white"
-                  />
-                </div>
-                <div className="space-y-2 md:col-span-2">
-                  <Label className="text-slate-700 font-medium">
-                    Insurance Company
-                  </Label>
-                  <Input
-                    value={formData.insuranceCompany}
-                    onChange={(e) =>
-                      setFormData({ ...formData, insuranceCompany: e.target.value })
-                    }
-                    placeholder="Enter company name"
-                    className="border-slate-200 focus:border-cyan-400 focus-visible:ring-cyan-100 bg-white"
-                  />
-                </div>
-                <div className="space-y-2 md:col-span-2">
-                  <Label className="text-slate-700 font-medium">
-                    Insurance Form (PDF/Image)
-                  </Label>
-                  <div className="flex flex-col gap-3">
-                    <Input
-                      type="file"
-                      accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-                      onChange={handleFileUpload}
-                      className="hidden"
-                      id="insurance-form-file"
-                    />
+              {(selectedItem || isBulk) && (
+                <div className="grid gap-6 p-6">
+                  {/* Beneficiary Details Card - Hide in Bulk */}
+                  {!isBulk && selectedItem && (
+                    <div className="rounded-xl border border-blue-100 bg-gradient-to-br from-blue-50/50 to-cyan-50/30 p-5 shadow-sm">
+                      <div className="flex items-center gap-2 mb-4 pb-2 border-b border-blue-100/50">
+                        <span className="bg-white p-1 rounded shadow-sm">
+                          <Shield className="h-4 w-4 text-blue-500" />
+                        </span>
+                        <h4 className="font-semibold text-blue-900">
+                          Beneficiary Details
+                        </h4>
+                      </div>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-y-4 gap-x-6 text-sm">
+                        {[
+                          { label: "Serial No", value: selectedItem.serialNo },
+                          { label: "Reg ID", value: selectedItem.regId },
+                          {
+                            label: "Beneficiary Name",
+                            value: selectedItem.beneficiaryName,
+                          },
+                          {
+                            label: "Father's Name",
+                            value: selectedItem.fatherName,
+                          },
+                          { label: "Village", value: selectedItem.village },
+                          { label: "District", value: selectedItem.district },
+                          { label: "Pump Type", value: selectedItem.pumpType },
+                          { label: "Company", value: selectedItem.company },
+                        ].map((field, i) => (
+                          <div key={i}>
+                            <span className="text-xs font-medium text-blue-600/70 uppercase tracking-wider block mb-1">
+                              {field.label}
+                            </span>
+                            <p className="font-semibold text-slate-700">
+                              {field.value || "-"}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Form Fields */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label className="text-slate-700 font-medium">
+                        Policy No
+                      </Label>
+                      <Input
+                        value={formData.policyNo}
+                        onChange={(e) =>
+                          setFormData({ ...formData, policyNo: e.target.value })
+                        }
+                        placeholder="Enter policy number"
+                        className="border-slate-200 focus:border-cyan-400 focus-visible:ring-cyan-100 bg-white"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-slate-700 font-medium">
+                        Policy Date
+                      </Label>
+                      <Input
+                        type="date"
+                        value={formData.policyDate}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            policyDate: e.target.value,
+                          })
+                        }
+                        className="border-slate-200 focus:border-cyan-400 focus-visible:ring-cyan-100 bg-white"
+                      />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <Label className="text-slate-700 font-medium">
+                        Insurance Company
+                      </Label>
+                      <Input
+                        value={formData.insuranceCompany}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            insuranceCompany: e.target.value,
+                          })
+                        }
+                        placeholder="Enter company name"
+                        className="border-slate-200 focus:border-cyan-400 focus-visible:ring-cyan-100 bg-white"
+                      />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <Label className="text-slate-700 font-medium">
+                        Insurance Form (PDF/Image)
+                      </Label>
+                      <div className="flex flex-col gap-3">
+                        <Input
+                          type="file"
+                          accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                          onChange={handleFileUpload}
+                          className="hidden"
+                          id="insurance-form-file"
+                        />
+                        <Button
+                          variant="outline"
+                          onClick={() =>
+                            document
+                              .getElementById("insurance-form-file")
+                              ?.click()
+                          }
+                          className="border-dashed border-blue-300 bg-blue-50/50 hover:bg-blue-50 text-blue-700 w-full h-24 flex flex-col gap-2 relative overflow-hidden group transition-all"
+                        >
+                          <div className="absolute inset-0 bg-blue-100/0 group-hover:bg-blue-100/20 transition-colors" />
+                          <Upload className="h-6 w-6 relative z-10" />
+                          <span className="relative z-10">
+                            {formData.insuranceForm
+                              ? "Change File"
+                              : "Click to upload form"}
+                          </span>
+                        </Button>
+                        {formData.insuranceForm && (
+                          <div className="flex items-center gap-2 p-2 bg-green-50 text-green-700 rounded-md border border-green-200 animate-in fade-in slide-in-from-left-2">
+                            <FileCheck className="h-4 w-4" />
+                            <span className="text-sm font-medium">
+                              {formData.insuranceForm}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Footer */}
+                  <div className="flex justify-end gap-3 pt-6 border-t border-slate-100 pb-6 pr-6">
                     <Button
                       variant="outline"
-                      onClick={() =>
-                        document.getElementById("insurance-form-file")?.click()
-                      }
-                      className="border-dashed border-blue-300 bg-blue-50/50 hover:bg-blue-50 text-blue-700 w-full h-24 flex flex-col gap-2 relative overflow-hidden group transition-all"
+                      onClick={() => setIsDialogOpen(false)}
+                      disabled={isSubmitting}
+                      className="px-6 bg-white hover:bg-slate-50 text-slate-700 border-slate-200"
                     >
-                      <div className="absolute inset-0 bg-blue-100/0 group-hover:bg-blue-100/20 transition-colors" />
-                      <Upload className="h-6 w-6 relative z-10" />
-                      <span className="relative z-10">
-                        {formData.insuranceForm
-                          ? "Change File"
-                          : "Click to upload form"}
-                      </span>
+                      Cancel
                     </Button>
-                    {formData.insuranceForm && (
-                      <div className="flex items-center gap-2 p-2 bg-green-50 text-green-700 rounded-md border border-green-200 animate-in fade-in slide-in-from-left-2">
-                        <FileCheck className="h-4 w-4" />
-                        <span className="text-sm font-medium">
-                          {formData.insuranceForm}
-                        </span>
-                      </div>
-                    )}
+                    <Button
+                      onClick={handleSubmit}
+                      disabled={isSubmitting}
+                      className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white shadow-lg shadow-cyan-500/20 px-8"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        "Submit Insurance"
+                      )}
+                    </Button>
                   </div>
                 </div>
-              </div>
-
-              {/* Footer */}
-              <div className="flex justify-end gap-3 pt-6 border-t border-slate-100 pb-6 pr-6">
-                <Button
-                  variant="outline"
-                  onClick={() => setIsDialogOpen(false)}
-                  disabled={isSubmitting}
-                  className="px-6 bg-white hover:bg-slate-50 text-slate-700 border-slate-200"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleSubmit}
-                  disabled={isSubmitting}
-                  className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white shadow-lg shadow-cyan-500/20 px-8"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    "Submit Insurance"
-                  )}
-                </Button>
-              </div>
-            </div>
+              )}
+            </>
           )}
-        </>
-      )}
-      </DialogContent>
+        </DialogContent>
       </Dialog>
     </div>
   );
